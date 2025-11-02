@@ -308,7 +308,129 @@ class LLMConfig:
     presence_penalty: float = 0.0
 ```
 
-#### 2.2.2 OpenAI Provider Implementation
+#### 2.2.2 Ollama Provider Implementation (Local Development)
+
+```python
+from ollama import AsyncClient
+from typing import List
+
+class OllamaProvider(LLMProvider):
+    def __init__(self, base_url: str = "http://localhost:11434", model: str = "llama3.1"):
+        self.client = AsyncClient(host=base_url)
+        self.model = model
+    
+    async def generate_response(
+        self,
+        messages: List[Message],
+        config: LLMConfig
+    ) -> LLMResponse:
+        """Generate response using Ollama API"""
+        
+        try:
+            # Format messages for Ollama (simple prompt format)
+            prompt = self._format_messages_for_ollama(messages)
+            
+            # Call Ollama API
+            response = await self.client.generate(
+                model=self.model,
+                prompt=prompt,
+                options={
+                    "temperature": config.temperature,
+                    "num_predict": config.max_tokens,
+                    "top_p": config.top_p,
+                },
+                stream=False
+            )
+            
+            return LLMResponse(
+                content=response['response'],
+                model=self.model,
+                tokens_used=response.get('eval_count', 0),  # Approximate
+                finish_reason="stop"
+            )
+            
+        except Exception as e:
+            raise LLMAPIError(f"Ollama API error: {str(e)}")
+    
+    def _format_messages_for_ollama(self, messages: List[Message]) -> str:
+        """Format messages for Ollama (converts to simple prompt format)"""
+        formatted = []
+        
+        for msg in messages:
+            if msg.role == "system":
+                formatted.append(f"System: {msg.content}")
+            elif msg.role == "user":
+                formatted.append(f"User: {msg.content}")
+            elif msg.role == "assistant":
+                formatted.append(f"Assistant: {msg.content}")
+        
+        # Add final prompt for assistant response
+        formatted.append("Assistant:")
+        
+        return "\n\n".join(formatted)
+    
+    async def classify_intent(self, message: str) -> Intent:
+        """Classify intent using Ollama"""
+        prompt = f"""Classify the intent of this message: "{message}"
+
+Possible intents: greeting, question, objection, interest, exit, information_request, policy_comparison
+
+Respond with only the intent name."""
+        
+        response = await self.client.generate(
+            model=self.model,
+            prompt=prompt,
+            options={"temperature": 0.1, "num_predict": 10}
+        )
+        
+        intent_str = response['response'].strip().lower()
+        try:
+            return Intent(intent_str)
+        except ValueError:
+            return Intent.UNKNOWN
+    
+    async def extract_entities(
+        self, 
+        message: str,
+        entity_types: List[str]
+    ) -> Dict[str, Any]:
+        """Extract entities using Ollama"""
+        prompt = f"""Extract the following from this message: "{message}"
+
+Extract: {', '.join(entity_types)}
+
+Return JSON format with extracted values or null if not found."""
+        
+        response = await self.client.generate(
+            model=self.model,
+            prompt=prompt,
+            options={"temperature": 0.1, "num_predict": 200}
+        )
+        
+        try:
+            import json
+            return json.loads(response['response'])
+        except:
+            return {}
+    
+    async def _call_with_retry(self, func, max_retries=3, **kwargs):
+        """Retry API call with exponential backoff"""
+        for attempt in range(max_retries):
+            try:
+                return await func(**kwargs)
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise
+                wait_time = 2 ** attempt
+                await asyncio.sleep(wait_time)
+```
+
+**Installation Requirements:**
+```bash
+pip install ollama
+```
+
+#### 2.2.3 OpenAI Provider Implementation
 
 ```python
 import openai
@@ -1775,6 +1897,1429 @@ async def get_leads_optimized(
         total=total,
         page=page,
         page_size=page_size
+    )
+```
+
+---
+
+## Complete API Specifications
+
+### 13.1 Conversation API (Complete)
+
+#### 13.1.4 End Conversation
+
+**Endpoint**: `POST /api/conversation/end`
+
+**Request**:
+```json
+{
+  "session_id": "uuid",
+  "reason": "customer_requested" // Optional: customer_requested, timeout, error
+}
+```
+
+**Response**:
+```json
+{
+  "session_id": "uuid",
+  "conversation_id": "uuid",
+  "status": "ended",
+  "summary": "Conversation ended. Customer showed interest in term life policy.",
+  "duration_seconds": 450,
+  "message": "Thank you for your time. Feel free to reach out if you have questions in the future."
+}
+```
+
+**Implementation**:
+```python
+@router.post("/conversation/end")
+async def end_conversation(request: EndConversationRequest):
+    session = await session_manager.get_session(request.session_id)
+    if not session:
+        raise SessionNotFoundError(request.session_id)
+    
+    # Generate conversation summary
+    summary = await conversation_service.generate_summary(session)
+    
+    # Update conversation record
+    await conversation_repository.update(
+        session.conversation_id,
+        {
+            "ended_at": datetime.utcnow(),
+            "duration_seconds": session.duration_seconds,
+            "conversation_summary": summary
+        }
+    )
+    
+    # Clean up session
+    await session_manager.delete_session(request.session_id)
+    
+    return EndConversationResponse(
+        session_id=request.session_id,
+        conversation_id=session.conversation_id,
+        status="ended",
+        summary=summary,
+        duration_seconds=session.duration_seconds
+    )
+```
+
+### 13.2 Lead Management API (Complete)
+
+#### 13.2.3 Get Lead by ID
+
+**Endpoint**: `GET /api/leads/{lead_id}`
+
+**Headers**:
+- `Authorization: Bearer {token}` (Admin only)
+
+**Response**:
+```json
+{
+  "id": "uuid",
+  "full_name": "John Doe",
+  "phone_number": "+1234567890", // Full number for admin
+  "nid": "***", // Masked for security
+  "address": "123 Main St, City, Country",
+  "policy_of_interest": "term-life-20yr",
+  "email": "john@example.com",
+  "preferred_contact_time": "evening",
+  "notes": "Interested in family protection",
+  "conversation_id": "uuid",
+  "status": "new",
+  "created_at": "2024-01-15T10:00:00Z",
+  "updated_at": "2024-01-15T10:00:00Z"
+}
+```
+
+#### 13.2.4 Update Lead
+
+**Endpoint**: `PUT /api/leads/{lead_id}`
+
+**Headers**:
+- `Authorization: Bearer {token}` (Admin only)
+
+**Request**:
+```json
+{
+  "status": "contacted", // Optional: new, contacted, converted, not_interested
+  "notes": "Contacted customer via phone on 2024-01-16" // Optional
+}
+```
+
+**Response**:
+```json
+{
+  "id": "uuid",
+  "status": "updated",
+  "message": "Lead updated successfully"
+}
+```
+
+### 13.3 Policy Management API
+
+#### 13.3.1 List Policies
+
+**Endpoint**: `GET /api/policies`
+
+**Query Parameters**:
+- `company`: Filter by company ("own_company" or competitor name)
+- `type`: Filter by policy type ("term", "whole_life", "universal")
+- `active`: Filter by active status (true/false)
+- `customer_age`: Filter by age eligibility (optional, for customer-facing)
+
+**Response**:
+```json
+{
+  "policies": [
+    {
+      "id": "uuid",
+      "name": "Term Life 20 Year",
+      "company": "own_company",
+      "type": "term",
+      "coverage_range": {
+        "min": 50000,
+        "max": 1000000
+      },
+      "premium_range": {
+        "min_monthly": 50,
+        "max_monthly": 200
+      },
+      "age_requirements": {
+        "min_age": 18,
+        "max_age": 65
+      },
+      "active": true
+    }
+  ],
+  "total": 15
+}
+```
+
+#### 13.3.2 Get Policy Details
+
+**Endpoint**: `GET /api/policies/{policy_id}`
+
+**Response**:
+```json
+{
+  "id": "uuid",
+  "name": "Term Life 20 Year",
+  "company": "own_company",
+  "type": "term",
+  "coverage_range": {
+    "min": 50000,
+    "max": 1000000
+  },
+  "premium_range": {
+    "min_monthly": 50,
+    "max_monthly": 200,
+    "factors": ["age", "health", "coverage_amount", "term_length"]
+  },
+  "age_requirements": {
+    "min_age": 18,
+    "max_age": 65
+  },
+  "benefits": [
+    "Family protection",
+    "Debt coverage",
+    "Flexible coverage amounts"
+  ],
+  "features": [
+    "No medical exam for amounts under $500K",
+    "Convertible to whole life",
+    "Rider options available"
+  ],
+  "description": "Affordable term life insurance...",
+  "medical_exam_required": false,
+  "created_at": "2024-01-01T00:00:00Z",
+  "updated_at": "2024-01-10T00:00:00Z"
+}
+```
+
+#### 13.3.3 Create Policy (Admin)
+
+**Endpoint**: `POST /api/policies`
+
+**Headers**:
+- `Authorization: Bearer {token}` (Admin only)
+
+**Request**:
+```json
+{
+  "name": "Whole Life Premium",
+  "company": "own_company",
+  "type": "whole_life",
+  "coverage_range": {
+    "min": 100000,
+    "max": 5000000
+  },
+  "premium_range": {
+    "min_monthly": 200,
+    "max_monthly": 1000,
+    "factors": ["age", "health", "coverage_amount"]
+  },
+  "age_requirements": {
+    "min_age": 18,
+    "max_age": 55
+  },
+  "benefits": ["Cash value", "Lifetime coverage", "Estate planning"],
+  "features": ["Dividend payments", "Loan against policy", "Flexible payments"],
+  "description": "Premium whole life insurance...",
+  "medical_exam_required": true
+}
+```
+
+#### 13.3.4 Update Policy (Admin)
+
+**Endpoint**: `PUT /api/policies/{policy_id}`
+
+**Headers**:
+- `Authorization: Bearer {token}` (Admin only)
+
+**Request**: Same structure as create, all fields optional
+
+### 13.4 Admin Authentication API
+
+#### 13.4.1 Login
+
+**Endpoint**: `POST /api/auth/login`
+
+**Request**:
+```json
+{
+  "username": "admin",
+  "password": "secure_password"
+}
+```
+
+**Response**:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "expires_in": 1800
+}
+```
+
+#### 13.4.2 Verify Token
+
+**Endpoint**: `GET /api/auth/verify`
+
+**Headers**:
+- `Authorization: Bearer {token}`
+
+**Response**:
+```json
+{
+  "valid": true,
+  "username": "admin",
+  "expires_at": "2024-01-15T10:30:00Z"
+}
+```
+
+---
+
+## File Storage Implementation
+
+### 14.1 Text File Storage (Phase 1)
+
+#### 14.1.1 Implementation
+
+```python
+import json
+import os
+from pathlib import Path
+from datetime import datetime
+from typing import List
+
+class FileStorageService:
+    def __init__(self, storage_path: str = "./data/leads"):
+        self.storage_path = Path(storage_path)
+        self.storage_path.mkdir(parents=True, exist_ok=True)
+    
+    async def save_lead(self, lead: Lead) -> None:
+        """Save lead to daily JSON file"""
+        filename = self._get_daily_filename()
+        filepath = self.storage_path / filename
+        
+        # Load existing data
+        leads = []
+        if filepath.exists():
+            with open(filepath, 'r') as f:
+                try:
+                    leads = json.load(f)
+                except json.JSONDecodeError:
+                    leads = []
+        
+        # Append new lead
+        lead_dict = {
+            "id": lead.id,
+            "full_name": lead.full_name,
+            "phone_number": lead.phone_number,  # Note: Consider encryption
+            "nid": lead.nid,  # Note: Consider encryption
+            "address": lead.address,
+            "policy_of_interest": lead.policy_of_interest,
+            "email": lead.email,
+            "preferred_contact_time": lead.preferred_contact_time,
+            "notes": lead.notes,
+            "conversation_id": lead.conversation_id,
+            "status": lead.status.value,
+            "created_at": lead.created_at.isoformat(),
+            "updated_at": lead.updated_at.isoformat()
+        }
+        
+        leads.append(lead_dict)
+        
+        # Save to file
+        with open(filepath, 'w') as f:
+            json.dump(leads, f, indent=2, ensure_ascii=False)
+    
+    async def export_leads_to_csv(self, leads: List[Lead]) -> str:
+        """Export leads to CSV format"""
+        import csv
+        from io import StringIO
+        
+        output = StringIO()
+        writer = csv.writer(output)
+        
+        # Header
+        writer.writerow([
+            "ID", "Full Name", "Phone", "Email", "Address", 
+            "Policy Interest", "Status", "Created At"
+        ])
+        
+        # Data rows
+        for lead in leads:
+            writer.writerow([
+                lead.id,
+                lead.full_name,
+                lead.phone_number,
+                lead.email or "",
+                lead.address,
+                lead.policy_of_interest,
+                lead.status.value,
+                lead.created_at.isoformat()
+            ])
+        
+        return output.getvalue()
+    
+    def _get_daily_filename(self) -> str:
+        """Get filename for today's leads"""
+        date_str = datetime.utcnow().strftime('%Y-%m-%d')
+        return f"leads_{date_str}.json"
+```
+
+#### 14.1.2 File Structure
+
+```
+data/
+├── leads/
+│   ├── leads_2024-01-15.json
+│   ├── leads_2024-01-16.json
+│   └── ...
+└── conversations/
+    ├── conversations_2024-01-15.json
+    └── ...
+```
+
+---
+
+## Repository Pattern Implementation
+
+### 15.1 Lead Repository
+
+```python
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update, delete
+from typing import Optional, List, Dict
+from models.lead import Lead, LeadStatus
+
+class LeadRepository:
+    def __init__(self, db_session: AsyncSession):
+        self.db = db_session
+    
+    async def create(self, lead: Lead) -> Lead:
+        """Create new lead"""
+        self.db.add(lead)
+        await self.db.commit()
+        await self.db.refresh(lead)
+        return lead
+    
+    async def find_by_id(self, lead_id: str) -> Optional[Lead]:
+        """Find lead by ID"""
+        result = await self.db.execute(
+            select(Lead).where(Lead.id == lead_id)
+        )
+        return result.scalar_one_or_none()
+    
+    async def find_by_phone_or_nid(
+        self, 
+        phone: Optional[str] = None,
+        nid: Optional[str] = None
+    ) -> Optional[Lead]:
+        """Find lead by phone or NID (for duplicate detection)"""
+        query = select(Lead)
+        conditions = []
+        
+        if phone:
+            conditions.append(Lead.phone_number == phone)
+        if nid:
+            conditions.append(Lead.nid == nid)
+        
+        if conditions:
+            from sqlalchemy import or_
+            query = query.where(or_(*conditions))
+            result = await self.db.execute(query)
+            return result.scalar_one_or_none()
+        
+        return None
+    
+    async def find_all(
+        self,
+        filters: Dict,
+        page: int = 1,
+        page_size: int = 50
+    ) -> PaginatedResult[Lead]:
+        """Find leads with filters and pagination"""
+        query = select(Lead)
+        
+        # Apply filters
+        if filters.get("status"):
+            query = query.where(Lead.status == LeadStatus(filters["status"]))
+        if filters.get("policy"):
+            query = query.where(Lead.policy_of_interest == filters["policy"])
+        if filters.get("date_from"):
+            query = query.where(Lead.created_at >= filters["date_from"])
+        if filters.get("date_to"):
+            query = query.where(Lead.created_at <= filters["date_to"])
+        
+        # Count total
+        count_query = select(func.count()).select_from(query.subquery())
+        total_result = await self.db.execute(count_query)
+        total = total_result.scalar()
+        
+        # Apply pagination
+        query = query.order_by(Lead.created_at.desc())
+        query = query.limit(page_size).offset((page - 1) * page_size)
+        
+        result = await self.db.execute(query)
+        leads = result.scalars().all()
+        
+        return PaginatedResult(
+            items=leads,
+            total=total,
+            page=page,
+            page_size=page_size
+        )
+    
+    async def update(self, lead_id: str, updates: Dict) -> Optional[Lead]:
+        """Update lead"""
+        lead = await self.find_by_id(lead_id)
+        if not lead:
+            return None
+        
+        for key, value in updates.items():
+            if hasattr(lead, key):
+                setattr(lead, key, value)
+        
+        lead.updated_at = datetime.utcnow()
+        await self.db.commit()
+        await self.db.refresh(lead)
+        return lead
+    
+    async def delete(self, lead_id: str) -> bool:
+        """Delete lead"""
+        lead = await self.find_by_id(lead_id)
+        if not lead:
+            return False
+        
+        await self.db.delete(lead)
+        await self.db.commit()
+        return True
+```
+
+### 15.2 Conversation Repository
+
+```python
+class ConversationRepository:
+    def __init__(self, db_session: AsyncSession):
+        self.db = db_session
+    
+    async def create(self, conversation: Conversation) -> Conversation:
+        """Create new conversation"""
+        self.db.add(conversation)
+        await self.db.commit()
+        await self.db.refresh(conversation)
+        return conversation
+    
+    async def find_by_id(self, conversation_id: str) -> Optional[Conversation]:
+        """Find conversation by ID"""
+        result = await self.db.execute(
+            select(Conversation).where(Conversation.id == conversation_id)
+        )
+        return result.scalar_one_or_none()
+    
+    async def find_by_session_id(self, session_id: str) -> Optional[Conversation]:
+        """Find conversation by session ID"""
+        result = await self.db.execute(
+            select(Conversation).where(Conversation.session_id == session_id)
+        )
+        return result.scalar_one_or_none()
+    
+    async def add_message(
+        self,
+        conversation_id: str,
+        role: MessageRole,
+        content: str,
+        metadata: Optional[Dict] = None
+    ) -> Message:
+        """Add message to conversation"""
+        message = Message(
+            id=str(uuid.uuid4()),
+            conversation_id=conversation_id,
+            role=role,
+            content=content,
+            timestamp=datetime.utcnow(),
+            metadata=metadata
+        )
+        self.db.add(message)
+        await self.db.commit()
+        await self.db.refresh(message)
+        return message
+    
+    async def get_messages(
+        self,
+        conversation_id: str,
+        limit: Optional[int] = None
+    ) -> List[Message]:
+        """Get messages for conversation"""
+        query = select(Message).where(
+            Message.conversation_id == conversation_id
+        ).order_by(Message.timestamp.asc())
+        
+        if limit:
+            query = query.limit(limit)
+        
+        result = await self.db.execute(query)
+        return result.scalars().all()
+    
+    async def update(
+        self,
+        conversation_id: str,
+        updates: Dict
+    ) -> Optional[Conversation]:
+        """Update conversation"""
+        conversation = await self.find_by_id(conversation_id)
+        if not conversation:
+            return None
+        
+        for key, value in updates.items():
+            if hasattr(conversation, key):
+                setattr(conversation, key, value)
+        
+        await self.db.commit()
+        await self.db.refresh(conversation)
+        return conversation
+```
+
+### 15.3 Policy Repository
+
+```python
+class PolicyRepository:
+    def __init__(self, db_session: AsyncSession):
+        self.db = db_session
+    
+    async def create(self, policy: Policy) -> Policy:
+        """Create new policy"""
+        self.db.add(policy)
+        await self.db.commit()
+        await self.db.refresh(policy)
+        return policy
+    
+    async def find_by_id(self, policy_id: str) -> Optional[Policy]:
+        """Find policy by ID"""
+        result = await self.db.execute(
+            select(Policy).where(Policy.id == policy_id)
+        )
+        return result.scalar_one_or_none()
+    
+    async def find_all(
+        self,
+        active: Optional[bool] = None,
+        company: Optional[str] = None,
+        policy_type: Optional[str] = None,
+        customer_age: Optional[int] = None
+    ) -> List[Policy]:
+        """Find policies with filters"""
+        query = select(Policy)
+        
+        if active is not None:
+            query = query.where(Policy.active == active)
+        if company:
+            query = query.where(Policy.company == company)
+        if policy_type:
+            query = query.where(Policy.type == policy_type)
+        if customer_age:
+            # Filter by age eligibility
+            query = query.where(
+                Policy.age_requirements['min_age'].astext.cast(Integer) <= customer_age,
+                Policy.age_requirements['max_age'].astext.cast(Integer) >= customer_age
+            )
+        
+        result = await self.db.execute(query)
+        return result.scalars().all()
+    
+    async def update(
+        self,
+        policy_id: str,
+        updates: Dict
+    ) -> Optional[Policy]:
+        """Update policy"""
+        policy = await self.find_by_id(policy_id)
+        if not policy:
+            return None
+        
+        for key, value in updates.items():
+            if hasattr(policy, key):
+                setattr(policy, key, value)
+        
+        policy.updated_at = datetime.utcnow()
+        await self.db.commit()
+        await self.db.refresh(policy)
+        return policy
+```
+
+---
+
+## Logging and Monitoring
+
+### 16.1 Structured Logging Implementation
+
+```python
+import logging
+import json
+from datetime import datetime
+from typing import Dict, Any
+
+class StructuredLogger:
+    def __init__(self, name: str):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(logging.INFO)
+        
+        # JSON formatter
+        handler = logging.StreamHandler()
+        formatter = JsonFormatter()
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+    
+    def info(self, message: str, **kwargs):
+        self.logger.info(message, extra=kwargs)
+    
+    def error(self, message: str, error: Exception, **kwargs):
+        self.logger.error(
+            message,
+            extra={
+                **kwargs,
+                "error_type": type(error).__name__,
+                "error_message": str(error),
+                "error_traceback": traceback.format_exc()
+            }
+        )
+    
+    def log_conversation_event(
+        self,
+        session_id: str,
+        event_type: str,
+        **data
+    ):
+        """Log conversation-related events"""
+        self.info(
+            f"Conversation event: {event_type}",
+            session_id=session_id,
+            event_type=event_type,
+            timestamp=datetime.utcnow().isoformat(),
+            **data
+        )
+    
+    def log_api_call(
+        self,
+        endpoint: str,
+        method: str,
+        status_code: int,
+        duration_ms: float,
+        **kwargs
+    ):
+        """Log API call"""
+        self.info(
+            "API call",
+            endpoint=endpoint,
+            method=method,
+            status_code=status_code,
+            duration_ms=duration_ms,
+            **kwargs
+        )
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        log_data = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        
+        # Add extra fields
+        for key, value in record.__dict__.items():
+            if key not in ['name', 'msg', 'args', 'created', 'filename',
+                          'funcName', 'levelname', 'levelno', 'lineno',
+                          'module', 'msecs', 'message', 'pathname',
+                          'process', 'processName', 'relativeCreated',
+                          'thread', 'threadName', 'exc_info', 'exc_text',
+                          'stack_info']:
+                log_data[key] = value
+        
+        return json.dumps(log_data)
+```
+
+### 16.2 Monitoring Metrics
+
+```python
+from typing import Dict
+from collections import defaultdict
+import time
+
+class MetricsCollector:
+    def __init__(self):
+        self.metrics = defaultdict(float)
+        self.counters = defaultdict(int)
+    
+    def increment_counter(self, metric_name: str, value: int = 1):
+        """Increment counter metric"""
+        self.counters[metric_name] += value
+    
+    def record_timing(self, metric_name: str, duration_ms: float):
+        """Record timing metric"""
+        self.metrics[f"{metric_name}.duration_ms"] = duration_ms
+    
+    def record_value(self, metric_name: str, value: float):
+        """Record gauge/value metric"""
+        self.metrics[metric_name] = value
+    
+    def get_metrics(self) -> Dict[str, Any]:
+        """Get all metrics"""
+        return {
+            "counters": dict(self.counters),
+            "gauges": dict(self.metrics)
+        }
+
+# Usage in services
+async def process_message_with_metrics(
+    session_id: str,
+    user_message: str
+):
+    start_time = time.time()
+    metrics = MetricsCollector()
+    
+    try:
+        response = await conversation_service.process_message(
+            session_id,
+            user_message
+        )
+        
+        metrics.increment_counter("conversation.messages.processed")
+        metrics.record_timing(
+            "conversation.response_time",
+            (time.time() - start_time) * 1000
+        )
+        
+        return response
+    except Exception as e:
+        metrics.increment_counter("conversation.errors")
+        raise
+```
+
+### 16.3 Health Check Endpoint
+
+```python
+from fastapi import APIRouter, status
+from pydantic import BaseModel
+
+router = APIRouter()
+
+class HealthCheckResponse(BaseModel):
+    status: str
+    version: str
+    database: str
+    redis: str
+    llm_provider: str
+
+@router.get("/health")
+async def health_check() -> HealthCheckResponse:
+    """Health check endpoint"""
+    
+    # Check database
+    db_status = "ok"
+    try:
+        await db.execute(select(1))
+    except:
+        db_status = "error"
+    
+    # Check Redis
+    redis_status = "ok"
+    try:
+        await redis_client.ping()
+    except:
+        redis_status = "error"
+    
+    # Check LLM provider
+    llm_status = "ok"
+    try:
+        # Quick test call or check API key
+        pass
+    except:
+        llm_status = "error"
+    
+    overall_status = "healthy" if all([
+        db_status == "ok",
+        redis_status == "ok",
+        llm_status == "ok"
+    ]) else "degraded"
+    
+    return HealthCheckResponse(
+        status=overall_status,
+        version="1.0.0",
+        database=db_status,
+        redis=redis_status,
+        llm_provider=llm_status
+    )
+```
+
+---
+
+## Configuration Management
+
+### 17.1 Environment Configuration
+
+```python
+from pydantic import BaseSettings
+from typing import Optional
+
+class Settings(BaseSettings):
+    # Application
+    app_name: str = "AI Life Insurance Sales Agent"
+    app_version: str = "1.0.0"
+    debug: bool = False
+    environment: str = "production"
+    
+    # Database
+    database_url: str
+    database_pool_size: int = 10
+    database_max_overflow: int = 20
+    
+    # Redis
+    redis_url: str = "redis://localhost:6379"
+    redis_password: Optional[str] = None
+    session_ttl: int = 3600
+    
+    # LLM Configuration
+    llm_provider: str = "openai"  # openai, anthropic, local
+    openai_api_key: Optional[str] = None
+    openai_model: str = "gpt-4"
+    anthropic_api_key: Optional[str] = None
+    anthropic_model: str = "claude-3-opus-20240229"
+    llm_temperature: float = 0.7
+    llm_max_tokens: int = 500
+    llm_timeout: int = 30
+    
+    # Security
+    encryption_key: str
+    jwt_secret_key: str
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 30
+    
+    # File Storage
+    file_storage_path: str = "./data"
+    enable_file_storage: bool = True
+    
+    # Logging
+    log_level: str = "INFO"
+    log_format: str = "json"
+    
+    # Rate Limiting
+    rate_limit_per_minute: int = 60
+    rate_limit_per_hour: int = 1000
+    
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+
+# Global settings instance
+settings = Settings()
+```
+
+### 17.2 Configuration File Example (.env)
+
+```bash
+# Application
+APP_NAME=AI Life Insurance Sales Agent
+ENVIRONMENT=production
+DEBUG=false
+
+# Database
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/lic_agent
+DATABASE_POOL_SIZE=10
+DATABASE_MAX_OVERFLOW=20
+
+# Redis
+REDIS_URL=redis://localhost:6379
+REDIS_PASSWORD=
+SESSION_TTL=3600
+
+# LLM
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4
+LLM_TEMPERATURE=0.7
+LLM_MAX_TOKENS=500
+
+# Security
+ENCRYPTION_KEY=... # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+JWT_SECRET_KEY=... # Generate secure random key
+JWT_EXPIRE_MINUTES=30
+
+# File Storage
+FILE_STORAGE_PATH=./data
+ENABLE_FILE_STORAGE=true
+
+# Logging
+LOG_LEVEL=INFO
+LOG_FORMAT=json
+```
+
+---
+
+## Conversation Summary Generation
+
+### 18.1 Summary Generation Algorithm
+
+```python
+async def generate_conversation_summary(
+    conversation: Conversation,
+    messages: List[Message],
+    llm_provider: LLMProvider
+) -> str:
+    """Generate conversation summary using LLM"""
+    
+    # Build summary prompt
+    prompt = f"""
+Summarize this life insurance sales conversation:
+
+Customer Profile:
+- Age: {conversation.customer_profile.age or 'Not provided'}
+- Purpose: {conversation.customer_profile.purpose or 'Not provided'}
+- Family: {conversation.customer_profile.dependents or 'Not provided'}
+
+Conversation Highlights:
+{_format_conversation_highlights(messages)}
+
+Outcome: {conversation.status or 'In progress'}
+
+Provide a concise summary (2-3 sentences) covering:
+1. Customer's main needs/concerns
+2. Policies discussed
+3. Customer's interest level
+4. Any objections raised
+5. Final outcome (lead created, not interested, etc.)
+"""
+    
+    response = await llm_provider.generate_response(
+        messages=[Message(role="user", content=prompt)],
+        config=LLMConfig(temperature=0.3, max_tokens=200)
+    )
+    
+    return response.content
+
+def _format_conversation_highlights(messages: List[Message]) -> str:
+    """Format key conversation points"""
+    highlights = []
+    
+    for msg in messages:
+        if msg.role == "user":
+            # Extract key customer statements
+            if any(keyword in msg.content.lower() 
+                   for keyword in ["interested", "want", "need", "concerned"]):
+                highlights.append(f"Customer: {msg.content[:100]}")
+    
+    return "\n".join(highlights[:10])  # Limit to 10 key points
+```
+
+---
+
+## Objection Handling Implementation
+
+### 19.1 Objection Detection
+
+```python
+from enum import Enum
+
+class ObjectionType(Enum):
+    COST = "cost"
+    NECESSITY = "necessity"
+    COMPLEXITY = "complexity"
+    TRUST = "trust"
+    TIMING = "timing"
+    COMPARISON = "comparison"
+
+def detect_objection(message: str, intent: Intent) -> Optional[ObjectionType]:
+    """Detect objection type from message"""
+    
+    message_lower = message.lower()
+    
+    # Cost objections
+    cost_keywords = ["expensive", "too costly", "can't afford", "price", "cost"]
+    if any(keyword in message_lower for keyword in cost_keywords):
+        return ObjectionType.COST
+    
+    # Necessity objections
+    necessity_keywords = ["don't need", "not necessary", "young and healthy", "already have"]
+    if any(keyword in message_lower for keyword in necessity_keywords):
+        return ObjectionType.NECESSITY
+    
+    # Complexity objections
+    complexity_keywords = ["too complicated", "don't understand", "confusing", "complex"]
+    if any(keyword in message_lower for keyword in complexity_keywords):
+        return ObjectionType.COMPLEXITY
+    
+    # Trust objections
+    trust_keywords = ["legitimate", "trust", "scam", "real", "verify"]
+    if any(keyword in message_lower for keyword in trust_keywords):
+        return ObjectionType.TRUST
+    
+    # Timing objections
+    timing_keywords = ["think about it", "maybe later", "not ready", "need time"]
+    if any(keyword in message_lower for keyword in timing_keywords):
+        return ObjectionType.TIMING
+    
+    # Comparison objections
+    comparison_keywords = ["better rate", "cheaper", "competitor", "other company"]
+    if any(keyword in message_lower for keyword in comparison_keywords):
+        return ObjectionType.COMPARISON
+    
+    return None
+```
+
+### 19.2 Objection Response Templates
+
+```python
+OBJECTION_RESPONSES = {
+    ObjectionType.COST: """
+I understand cost is an important consideration. Let me break this down:
+- For a ${coverage_amount} policy, that's about ${daily_cost} per day
+- That's less than a cup of coffee, but provides financial security for your family
+- We also offer lower coverage options if that better fits your budget
+- The peace of mind is invaluable, wouldn't you agree?
+""",
+    
+    ObjectionType.NECESSITY: """
+I appreciate that perspective. However, consider this:
+- Life insurance is about protecting those who depend on you
+- Statistics show that {relevant_stat} can happen unexpectedly
+- Getting coverage while you're young and healthy locks in lower rates
+- It's better to have it and not need it than need it and not have it
+""",
+    
+    ObjectionType.COMPLEXITY: """
+I understand it can seem complex. Let me simplify it for you:
+- Think of it as protecting your family's financial future
+- You choose how much coverage and for how long
+- We'll guide you through every step - it's actually quite straightforward
+- Many of our customers find it simpler than they expected
+"""
+}
+
+async def handle_objection(
+    objection_type: ObjectionType,
+    session: Session,
+    llm_provider: LLMProvider
+) -> str:
+    """Generate personalized objection response"""
+    
+    template = OBJECTION_RESPONSES.get(objection_type, "")
+    
+    # Customize template with customer data
+    customized = template.format(
+        coverage_amount=session.customer_profile.coverage_amount_interest or "100,000",
+        daily_cost="1.67",  # Calculate based on policy
+        relevant_stat="1 in 4 people..."  # Add relevant statistic
+    )
+    
+    # Use LLM to make response more natural and personalized
+    prompt = f"""
+Customer raised this objection: {objection_type.value}
+
+Customer profile: {session.customer_profile}
+Our response template: {customized}
+
+Generate a natural, empathetic response that addresses their specific concern.
+Be understanding, provide value, but don't be pushy.
+"""
+    
+    response = await llm_provider.generate_response(
+        messages=[Message(role="user", content=prompt)],
+        config=LLMConfig(temperature=0.7, max_tokens=300)
+    )
+    
+    return response.content
+```
+
+---
+
+## Closing Techniques Implementation
+
+### 20.1 Closing Detection
+
+```python
+class ClosingType(Enum):
+    ASSUMPTIVE = "assumptive"
+    ALTERNATIVE = "alternative"
+    SUMMARY = "summary"
+    URGENCY = "urgency"
+
+def should_attempt_close(
+    session: Session,
+    interest_level: InterestLevel
+) -> bool:
+    """Determine if closing should be attempted"""
+    
+    # Only close if interest is medium or high
+    if interest_level in [InterestLevel.MEDIUM, InterestLevel.HIGH]:
+        return True
+    
+    # Check for positive buying signals
+    recent_messages = session.message_history[-5:]
+    buying_signals = [
+        "interested", "I want", "sign up", "apply", 
+        "what's next", "how do I"
+    ]
+    
+    for msg in recent_messages:
+        if msg.role == "user":
+            if any(signal in msg.content.lower() for signal in buying_signals):
+                return True
+    
+    return False
+
+async def generate_close(
+    closing_type: ClosingType,
+    session: Session,
+    llm_provider: LLMProvider
+) -> str:
+    """Generate closing statement"""
+    
+    prompts = {
+        ClosingType.ASSUMPTIVE: """
+Based on our conversation, which policy do you think would work best for your situation?
+""",
+        ClosingType.ALTERNATIVE: """
+Would you prefer the term life policy or the whole life policy? Both have great benefits.
+""",
+        ClosingType.SUMMARY: """
+Let me summarize what we've discussed:
+- Your main need: {purpose}
+- Recommended policy: {policy}
+- Coverage amount: {coverage}
+- Premium: approximately {premium} per month
+
+Does this sound right for you?
+""",
+        ClosingType.URGENCY: """
+Since you're {age} years old, this is actually a great time to secure coverage. 
+Premiums increase as you age, so locking in these rates now makes sense.
+Would you like to proceed?
+"""
+    }
+    
+    prompt = prompts[closing_type].format(
+        purpose=session.customer_profile.purpose or "family protection",
+        policy=session.collected_data.policy_of_interest or "term life",
+        coverage=session.customer_profile.coverage_amount_interest or "$100,000",
+        premium="$50",
+        age=session.customer_profile.age or "30"
+    )
+    
+    # Enhance with LLM for naturalness
+    enhanced_prompt = f"""
+Generate a natural, non-pushy closing statement based on:
+Closing type: {closing_type.value}
+Customer situation: {session.customer_profile}
+Prompt: {prompt}
+
+Make it conversational and respectful.
+"""
+    
+    response = await llm_provider.generate_response(
+        messages=[Message(role="user", content=enhanced_prompt)],
+        config=LLMConfig(temperature=0.7, max_tokens=200)
+    )
+    
+    return response.content
+```
+
+---
+
+## Rate Limiting Implementation
+
+### 21.1 Rate Limiter
+
+```python
+from collections import defaultdict
+from datetime import datetime, timedelta
+from typing import Dict, Tuple
+
+class RateLimiter:
+    def __init__(self, redis_client):
+        self.redis = redis_client
+        self.limits = {
+            "conversation_message": (60, 60),  # 60 per minute
+            "api_call": (1000, 3600),  # 1000 per hour
+            "lead_creation": (10, 60)  # 10 per minute
+        }
+    
+    async def check_limit(
+        self,
+        key: str,
+        limit_type: str
+    ) -> Tuple[bool, int]:
+        """Check if rate limit is exceeded"""
+        
+        if limit_type not in self.limits:
+            return True, 0
+        
+        max_requests, window_seconds = self.limits[limit_type]
+        redis_key = f"rate_limit:{limit_type}:{key}"
+        
+        # Get current count
+        current = await self.redis.get(redis_key)
+        count = int(current) if current else 0
+        
+        if count >= max_requests:
+            # Get TTL
+            ttl = await self.redis.ttl(redis_key)
+            return False, ttl
+        
+        # Increment counter
+        await self.redis.incr(redis_key)
+        if count == 0:
+            await self.redis.expire(redis_key, window_seconds)
+        
+        return True, max_requests - count - 1
+
+# Usage in middleware
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    rate_limiter = RateLimiter(redis_client)
+    
+    # Get identifier (IP address or session ID)
+    identifier = request.client.host
+    if "session_id" in request.query_params:
+        identifier = request.query_params["session_id"]
+    
+    # Check limit
+    allowed, remaining = await rate_limiter.check_limit(
+        identifier,
+        "api_call"
+    )
+    
+    if not allowed:
+        return JSONResponse(
+            status_code=429,
+            content={
+                "error": "rate_limit_exceeded",
+                "message": "Too many requests. Please try again later.",
+                "retry_after": remaining
+            },
+            headers={"Retry-After": str(remaining)}
+        )
+    
+    response = await call_next(request)
+    response.headers["X-RateLimit-Remaining"] = str(remaining)
+    return response
+```
+
+---
+
+## Testing Approach
+
+### 22.1 Unit Testing Strategy
+
+```python
+import pytest
+from unittest.mock import Mock, AsyncMock, patch
+
+# Example: Conversation Service Test
+class TestConversationService:
+    @pytest.fixture
+    def mock_llm_provider(self):
+        provider = Mock()
+        provider.generate_response = AsyncMock(
+            return_value=LLMResponse(
+                content="Hello! How can I help?",
+                model="gpt-4",
+                tokens_used=10
+            )
+        )
+        return provider
+    
+    @pytest.fixture
+    def conversation_service(self, mock_llm_provider):
+        return ConversationService(
+            llm_provider=mock_llm_provider,
+            session_manager=Mock(),
+            policy_service=Mock(),
+            validation_service=Mock(),
+            lead_service=Mock()
+        )
+    
+    @pytest.mark.asyncio
+    async def test_start_conversation(self, conversation_service):
+        session = await conversation_service.start_conversation()
+        assert session is not None
+        assert session.session_id is not None
+        assert session.conversation_stage == ConversationStage.INTRODUCTION
+    
+    @pytest.mark.asyncio
+    async def test_process_message(self, conversation_service):
+        session_id = "test-session"
+        response = await conversation_service.process_message(
+            session_id,
+            "Hello"
+        )
+        assert response.message is not None
+        assert response.session_id == session_id
+```
+
+### 22.2 Integration Testing
+
+```python
+from fastapi.testclient import TestClient
+
+def test_conversation_flow():
+    """Test complete conversation flow"""
+    client = TestClient(app)
+    
+    # Start conversation
+    response = client.post("/api/conversation/start")
+    assert response.status_code == 200
+    session_id = response.json()["session_id"]
+    
+    # Send message
+    response = client.post(
+        "/api/conversation/message",
+        json={"session_id": session_id, "message": "I'm 35"}
+    )
+    assert response.status_code == 200
+    assert "response" in response.json()
+    
+    # Get history
+    response = client.get(f"/api/conversation/{session_id}")
+    assert response.status_code == 200
+    assert len(response.json()["messages"]) >= 2
+```
+
+### 22.3 Test Data Fixtures
+
+```python
+@pytest.fixture
+def sample_lead():
+    return Lead(
+        id="test-lead-id",
+        full_name="Test User",
+        phone_number="+1234567890",
+        nid="123456789",
+        address="123 Test St",
+        policy_of_interest="term-life-20yr",
+        conversation_id="test-conv-id",
+        status=LeadStatus.NEW,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+
+@pytest.fixture
+def sample_policy():
+    return Policy(
+        id="test-policy-id",
+        name="Test Term Life",
+        company="own_company",
+        type="term",
+        coverage_range=CoverageRange(min=50000, max=1000000),
+        premium_range=PremiumRange(min_monthly=50, max_monthly=200),
+        age_requirements=AgeRequirements(min_age=18, max_age=65),
+        benefits=["Family protection"],
+        features=["No medical exam"],
+        description="Test policy",
+        medical_exam_required=False,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
     )
 ```
 
