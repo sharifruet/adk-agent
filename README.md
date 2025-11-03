@@ -81,10 +81,14 @@ cp .env.docker.example .env
 # Edit .env and add encryption keys (see docs/development-environment-setup.md)
 
 # 6. Run database migrations
+cd app
 alembic upgrade head
 
 # 7. Start application
+cd app
 uvicorn src.main:app --reload --port 8000
+# Or from root directory:
+# PYTHONPATH=app uvicorn app.src.main:app --reload --port 8000
 ```
 
 **Application will be available at:**
@@ -121,19 +125,22 @@ lic-agent/
 │   ├── development-environment-setup.md  # Local environment setup
 │   └── docker-setup.md          # Docker-specific setup guide
 │
-├── src/                          # Source Code (to be created)
-│   ├── api/                      # API routes
-│   ├── services/                 # Business logic
-│   ├── models/                   # Data models
-│   ├── repositories/             # Data access layer
-│   ├── llm/                      # LLM integration
-│   └── utils/                    # Utilities
+├── app/                          # Application code
+│   ├── src/                      # Source code
+│   │   ├── api/                  # API routes
+│   │   ├── services/             # Business logic
+│   │   ├── models/               # Data models
+│   │   ├── repositories/         # Data access layer
+│   │   ├── llm/                  # LLM integration
+│   │   └── utils/                # Utilities
+│   ├── tests/                    # Test files
+│   ├── alembic/                  # Database migrations
+│   ├── alembic.ini               # Alembic configuration
+│   └── scripts/                  # Utility scripts
 │
-├── tests/                        # Test files (to be created)
 ├── data/                         # Application data (created at runtime)
 │   ├── leads/                    # Lead data files
 │   └── conversations/            # Conversation logs
-└── alembic/                      # Database migrations
 ```
 
 ---
@@ -190,16 +197,19 @@ lic-agent/
 
 2. **Run Application**
    ```bash
+   cd app
    uvicorn src.main:app --reload --port 8000
    ```
 
 3. **Run Tests**
    ```bash
+   cd app
    pytest
    ```
 
 4. **Database Migrations**
    ```bash
+   cd app
    # Create migration
    alembic revision --autogenerate -m "Description"
    
