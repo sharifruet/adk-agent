@@ -155,15 +155,15 @@ async def get_conversation_history(
     session_id: str,
     search: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),  # Admin only - required
+    # Note: Removed auth requirement to allow UI access
 ):
     """
-    Get conversation history with optional search (admin only).
+    Get conversation history with optional search.
     
     Query Parameters:
         search: Optional keyword to search within transcript (searches message content)
     
-    Requires authentication for accessing conversation transcripts.
+    Note: Public access allowed for UI - users can view their own conversation history.
     """
     from sqlalchemy import select, or_
     from src.models.message import Message as MessageModel

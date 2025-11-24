@@ -19,7 +19,8 @@ class OllamaProvider(LLMProvider):
     def __init__(self, base_url: str = None, model: str = None):
         self.base_url = base_url or settings.ollama_base_url
         self.model = model or settings.ollama_model
-        self.client = httpx.AsyncClient(timeout=settings.llm_timeout)
+        # Increase timeout for Ollama - it can be slow, especially on first request
+        self.client = httpx.AsyncClient(timeout=120.0)  # 2 minutes for Ollama
     
     async def generate_response(
         self,
@@ -53,7 +54,7 @@ class OllamaProvider(LLMProvider):
                     },
                     "stream": False
                 },
-                timeout=30.0  # 30 second timeout
+                timeout=120.0  # 2 minute timeout for Ollama (can be slow)
             )
             response.raise_for_status()
             data = response.json()
@@ -66,10 +67,11 @@ class OllamaProvider(LLMProvider):
             )
         
         try:
+            import httpx
             return await retry_service.retry_with_backoff(
                 _call_ollama_api,
                 operation_name="Ollama API call",
-                retryable_exceptions=[Exception],
+                retryable_exceptions=[httpx.ReadTimeout, httpx.ConnectTimeout, httpx.TimeoutException],
                 non_retryable_exceptions=[]
             )
         except Exception as e:
@@ -115,7 +117,7 @@ Respond with only the intent name."""
                     "options": {"temperature": 0.1, "num_predict": 10},
                     "stream": False
                 },
-                timeout=15.0  # 15 second timeout for intent classification
+                timeout=60.0  # 60 second timeout for intent classification (Ollama can be slow)
             )
             response.raise_for_status()
             data = response.json()
@@ -127,10 +129,11 @@ Respond with only the intent name."""
                 return Intent.UNKNOWN
         
         try:
+            import httpx
             return await retry_service.retry_with_backoff(
                 _classify_intent_api,
                 operation_name="Ollama intent classification",
-                retryable_exceptions=[Exception],
+                retryable_exceptions=[httpx.ReadTimeout, httpx.ConnectTimeout, httpx.TimeoutException],
                 non_retryable_exceptions=[]
             )
         except Exception:

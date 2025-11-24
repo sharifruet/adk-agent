@@ -1,12 +1,15 @@
 """Main FastAPI application entry point."""
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 from redis import asyncio as redis_async
 import httpx
+import os
 from src.config import settings
 from src.api.router import api_router
 from src.database import engine
@@ -50,10 +53,18 @@ app.add_exception_handler(Exception, generic_exception_handler)
 # Include API routers
 app.include_router(api_router)
 
+# Mount static files for frontend
+static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
 
 @app.get("/")
 async def root():
-    """Root endpoint."""
+    """Root endpoint - serves frontend if available, otherwise returns API info."""
+    static_index = os.path.join(static_dir, "index.html")
+    if os.path.exists(static_index):
+        return FileResponse(static_index)
     return {
         "message": "AI Life Insurance Sales Agent API",
         "version": settings.app_version,

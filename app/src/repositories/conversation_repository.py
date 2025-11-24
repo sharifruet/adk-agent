@@ -46,7 +46,7 @@ class ConversationRepository:
             conversation_id=conversation_id,
             role=role,
             content=content,
-            metadata=metadata,  # Store metadata if provided
+            message_metadata=metadata,  # Store metadata if provided
         )
         self.session.add(message)
         await self.session.flush()
