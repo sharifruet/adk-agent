@@ -29,7 +29,7 @@
 
 ## Document Purpose
 
-This document defines the LLM (Large Language Model) integration design for the AI Life Insurance Sales Agent. It includes system prompts, conversation templates, prompt engineering strategies, and all LLM-related configurations.
+This document defines the LLM (Large Language Model) integration design for the AI Life Insurance Sales Agent. The system uses **RAG (Retrieval Augmented Generation)** with a custom knowledge base containing company-specific policy documents. This document includes system prompts, conversation templates, RAG-based prompt construction, prompt engineering strategies, and all LLM-related configurations.
 
 **Intended Audience**:
 - AI/ML engineers
@@ -248,21 +248,23 @@ Example Questions:
 "Great! Can you tell me what's the main reason you're looking into life insurance? For example, is it for family protection, debt coverage, or something else?"
 ```
 
-#### 3.2.3 Information Stage Prompt
+#### 3.2.3 Information Stage Prompt (RAG-Augmented)
 
 ```python
 INFORMATION_PROMPT = BASE_SYSTEM_PROMPT + """
 Current Stage: Policy Information & Education
 
 Your Task:
-Provide relevant policy information based on customer profile:
-- Present 2-3 most suitable policies
-- Explain features and benefits clearly
+Provide relevant policy information based on customer profile using the retrieved policy knowledge base information:
+- Present 2-3 most suitable policies from the retrieved context
+- Explain features and benefits clearly using the policy documents provided
 - Use examples relevant to customer's situation
-- Answer questions about policies
+- Answer questions about policies using ONLY information from the retrieved policy documents
 - Compare options when asked
 
 Guidelines:
+- Use ONLY information from the retrieved policy context below - do not make up policy details
+- If information is not in the retrieved context, say you don't have that specific information
 - Start with policies most relevant to customer
 - Use simple, clear language
 - Explain technical terms
@@ -270,13 +272,19 @@ Guidelines:
 - Focus on benefits, not just features
 - Be honest about limitations
 - Don't overwhelm with too much information at once
+- Cite which policy you're referencing when presenting multiple options
+
+Retrieved Policy Context:
+{retrieved_policy_context}
+
+IMPORTANT: Only use information from the retrieved policy context above. Do not invent or assume policy details that are not explicitly stated in the retrieved context.
 
 Policy Presentation Format:
-1. Policy name and type
-2. Key benefits for customer's situation
-3. Coverage range
-4. Premium range (explain factors affecting cost)
-5. Who it's best for
+1. Policy name and type (from retrieved context)
+2. Key benefits for customer's situation (from retrieved context)
+3. Coverage range (from retrieved context)
+4. Premium range (from retrieved context, explain factors affecting cost)
+5. Who it's best for (based on retrieved context and customer profile)
 """
 ```
 
@@ -625,7 +633,7 @@ Thank you for your time today!
 
 ### 5.1 Prompt Structure
 
-#### Standard Prompt Format
+#### Standard Prompt Format (RAG-Enhanced)
 
 ```python
 PROMPT_STRUCTURE = """
@@ -636,14 +644,77 @@ Context:
 - Customer Profile: {customer_profile}
 - Conversation Stage: {stage}
 - Previous Messages: {message_history}
-- Available Policies: {policies}
+- Retrieved Policy Context: {retrieved_policy_context}
 
 Current User Message:
 {user_message}
 
 Instructions:
 {task_specific_instructions}
+
+IMPORTANT: When discussing policies, use ONLY information from the Retrieved Policy Context above. If you don't have specific information in the retrieved context, admit that you don't have that information rather than making assumptions.
 """
+```
+
+#### RAG-Based Prompt Construction
+
+The system uses Retrieval Augmented Generation (RAG) to provide accurate policy information. Here's how policy context is retrieved and injected into prompts:
+
+```python
+async def build_rag_enhanced_prompt(
+    user_message: str,
+    customer_profile: CustomerProfile,
+    conversation_history: List[Message]
+) -> str:
+    """
+    Build prompt with RAG-retrieved policy context
+    """
+    # 1. Build query from user message and customer profile
+    query = build_semantic_query(user_message, customer_profile)
+    
+    # 2. Retrieve relevant policy documents from knowledge base
+    retrieved_policies = await policy_service.search_policies(
+        query=query,
+        customer_profile=customer_profile,
+        top_k=3  # Retrieve top 3 most relevant policies
+    )
+    
+    # 3. Format retrieved context for prompt
+    policy_context = format_retrieved_context(retrieved_policies)
+    
+    # 4. Build prompt with retrieved context
+    prompt = PROMPT_STRUCTURE.format(
+        system_prompt=INFORMATION_PROMPT,
+        customer_profile=format_customer_profile(customer_profile),
+        stage="information",
+        message_history=format_message_history(conversation_history),
+        retrieved_policy_context=policy_context,  # RAG-retrieved context
+        user_message=user_message,
+        task_specific_instructions="Answer the customer's question using the retrieved policy information."
+    )
+    
+    return prompt
+
+def format_retrieved_context(retrieved_policies: List[RetrievedPolicy]) -> str:
+    """Format retrieved policies for prompt inclusion"""
+    context_parts = []
+    
+    for i, policy in enumerate(retrieved_policies, 1):
+        context_parts.append(f"""
+Policy {i}: {policy.policy_name} ({policy.policy_type})
+
+Content:
+{policy.content}
+
+Metadata:
+- Coverage Range: {policy.metadata.get('coverage_range')}
+- Premium Range: {policy.metadata.get('premium_range')}
+- Age Requirements: {policy.metadata.get('age_requirements')}
+- Source: {policy.source}
+- Similarity Score: {policy.similarity_score:.2f}
+""")
+    
+    return "\n".join(context_parts)
 ```
 
 ### 5.2 Few-Shot Learning Examples
@@ -741,7 +812,7 @@ Respond as this experienced, caring agent would.
 
 ### 6.1 Context Window Strategy
 
-#### Token Budget Allocation
+#### Token Budget Allocation (RAG-Enhanced)
 
 ```
 Total Context Window: 8,000 tokens (conservative for GPT-4)
@@ -749,13 +820,50 @@ Total Context Window: 8,000 tokens (conservative for GPT-4)
 Allocation:
 - System Prompt: ~500 tokens
 - Customer Profile: ~200 tokens
-- Policy Information (top 3): ~800 tokens
+- Retrieved Policy Context (RAG): ~1,200 tokens (3 policies × ~400 tokens each)
+  - Policy 1 content + metadata: ~400 tokens
+  - Policy 2 content + metadata: ~400 tokens
+  - Policy 3 content + metadata: ~400 tokens
 - Recent Messages (last 20): ~2,000 tokens
 - Conversation Summary: ~300 tokens
 - Current Message: ~200 tokens
-- Reserved Buffer: ~4,000 tokens
+- Reserved Buffer: ~3,600 tokens
 
-Strategy: Keep last 50 messages maximum, summarize older messages
+Strategy: 
+- Keep last 50 messages maximum, summarize older messages
+- Limit retrieved policy context to top 3 most relevant policies
+- Truncate policy chunks if they exceed ~400 tokens per policy
+- Use metadata filtering to reduce retrieved content size
+```
+
+#### RAG Context Management
+
+The retrieved policy context is dynamically included based on the conversation needs:
+
+```python
+RAG_CONTEXT_STRATEGY = {
+    "when_to_retrieve": [
+        "Customer asks about policies",
+        "Customer mentions specific policy type",
+        "Transitioning to information stage",
+        "Customer asks comparison questions",
+        "Need to answer policy-specific questions"
+    ],
+    
+    "retrieval_parameters": {
+        "top_k": 3,  # Retrieve top 3 most relevant policy chunks
+        "min_similarity": 0.7,  # Minimum similarity score threshold
+        "max_tokens_per_policy": 400,  # Limit each policy chunk size
+        "include_metadata": True,  # Include policy metadata (coverage, premiums, etc.)
+        "filter_by_eligibility": True  # Filter by customer age/eligibility
+    },
+    
+    "context_injection": {
+        "format": "Structured with policy name, content, and metadata",
+        "placement": "After system prompt, before conversation history",
+        "instruction": "Use ONLY information from retrieved context"
+    }
+}
 ```
 
 #### Context Compression Algorithm
@@ -1007,19 +1115,78 @@ def check_brand_safety(response: str) -> bool:
     pass
 ```
 
-### 8.3 Fact-Checking for Policies
+### 8.3 Fact-Checking for Policies (RAG-Based)
+
+Since policy information comes from the RAG knowledge base, fact-checking is built into the retrieval process:
 
 ```python
-def verify_policy_information(response: str, policy_db: List[Policy]) -> str:
+async def verify_policy_response(
+    response: str,
+    retrieved_policies: List[RetrievedPolicy],
+    original_query: str
+) -> Tuple[str, bool]:
     """
-    Verify that policy information in response matches database
+    Verify that response is grounded in retrieved policy context.
+    
+    Returns:
+        - Verified response (possibly corrected)
+        - Whether response is accurate (True/False)
     """
-    # Extract policy mentions
-    # Cross-reference with database
-    # Flag discrepancies
-    # Correct if needed
-    pass
+    # Extract policy mentions from response
+    policy_mentions = extract_policy_mentions(response)
+    
+    # Check if each mention has supporting evidence in retrieved context
+    verification_results = []
+    for mention in policy_mentions:
+        # Find supporting evidence in retrieved policies
+        supporting_evidence = find_supporting_evidence(mention, retrieved_policies)
+        
+        if supporting_evidence:
+            verification_results.append({
+                "mention": mention,
+                "verified": True,
+                "source": supporting_evidence.source
+            })
+        else:
+            verification_results.append({
+                "mention": mention,
+                "verified": False,
+                "warning": "No supporting evidence in retrieved context"
+            })
+    
+    # If unverified claims found, flag or correct
+    unverified = [r for r in verification_results if not r["verified"]]
+    
+    if unverified:
+        # Log warning
+        logger.warning(f"Response contains unverified policy claims: {unverified}")
+        
+        # Option 1: Return response with warning
+        # Option 2: Correct response to only use verified information
+        corrected_response = correct_response_with_retrieved_context(
+            response, retrieved_policies, unverified
+        )
+        return corrected_response, False
+    
+    return response, True
+
+def find_supporting_evidence(
+    policy_mention: str,
+    retrieved_policies: List[RetrievedPolicy]
+) -> Optional[RetrievedPolicy]:
+    """Find if policy mention has supporting evidence in retrieved context"""
+    for policy in retrieved_policies:
+        if policy_mention.lower() in policy.content.lower() or \
+           policy_mention.lower() in policy.policy_name.lower():
+            return policy
+    return None
 ```
+
+**RAG-Based Accuracy Guarantees**:
+- All policy information comes from company-specific knowledge base
+- LLM is instructed to only use retrieved context
+- Response verification ensures grounding in retrieved documents
+- Reduces hallucinations by constraining LLM to retrieved information
 
 ---
 
@@ -1419,15 +1586,21 @@ age = extract_entity(user_message, "age")  # Returns 35
 # Update customer profile
 # Continue to next question
 
-# Step 5: Present policies
-# Build policy context
-policies = get_relevant_policies(age=35, purpose="family protection")
+# Step 5: Present policies (RAG-based)
+# Retrieve policies from knowledge base using RAG
+query = build_enhanced_query("policies for young families", customer_profile)
+retrieved_policies = await policy_service.search_policies(
+    query=query,
+    customer_profile=customer_profile,
+    top_k=3
+)
+# Build RAG-augmented prompt with retrieved context
 response = await llm.generate(
     ...,
-    policies=policies,
+    retrieved_policy_context=format_retrieved_context(retrieved_policies),
     stage="information"
 )
-# Expected: Present 2-3 relevant policies with benefits
+# Expected: Present 2-3 relevant policies with benefits from knowledge base
 
 # Step 6: Handle objection
 user_message = "That sounds expensive"

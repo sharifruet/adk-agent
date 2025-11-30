@@ -7,12 +7,13 @@ So that **I can understand my options and make an informed decision**
 
 ## Acceptance Criteria
 
-### AC-004.1: Policy Database Access
+### AC-004.1: Policy Knowledge Base Access (RAG-Based)
 - Given the system has customer qualifying information
 - When presenting policies
-- Then the system accesses a comprehensive database of company policies
+- Then the system retrieves policy information from the **custom knowledge base (RAG-based)** containing company-specific policy documents
+- And the system uses **semantic search** to find relevant policies based on customer query and profile
 - And the system presents policies in order of relevance to customer needs
-- And policy information is up-to-date and accurate
+- And policy information is accurate and grounded in retrieved knowledge base documents
 
 ### AC-004.2: Initial Policy Presentation
 - Given the system is ready to present policies
@@ -88,12 +89,16 @@ So that **I can understand my options and make an informed decision**
 
 ## Technical Notes
 
-- Policy database via `PolicyService` and `PolicyRepository`
-- Policy matching based on customer profile (age, purpose, dependents)
-- Policy information formatted via `PromptManager` and `ContextManager`
-- Dynamic example generation based on customer data via LLM
-- Policy eligibility checking based on customer age
-- Policies included in LLM context for natural presentation
+- **RAG-Based Retrieval**: Policy information retrieved from vector database knowledge base using semantic search
+- **Policy Knowledge Base**: Custom knowledge base containing company-specific policy documents (PDFs, text files, structured data)
+- **Semantic Search**: Uses embeddings to find relevant policy chunks based on customer query and profile
+- **Policy Service**: `PolicyService.search_policies()` performs semantic search on vector database
+- **Retrieved Context**: Top-k relevant policy documents retrieved and injected into LLM prompt
+- **RAG Integration**: LLM generates responses using ONLY retrieved policy context (reduces hallucinations)
+- Policy matching based on customer profile (age, purpose, dependents) via query enhancement
+- Policy information formatted via `PromptManager` and `ContextManager` with retrieved context
+- Dynamic example generation based on customer data via LLM using retrieved policy information
+- Policy eligibility checking based on customer age (metadata filtering in retrieval)
 
 ## API Implementation
 
@@ -115,28 +120,34 @@ So that **I can understand my options and make an informed decision**
 ]
 ```
 
-**Conversation Integration**:
-- Policies retrieved via `PolicyService.list_policies()`
-- Top 5 policies included in LLM context
-- Policies formatted in system prompts
-- LLM presents policies naturally based on customer profile
+**Conversation Integration (RAG-Based)**:
+- Policies retrieved via `PolicyService.search_policies()` using semantic search
+- Customer query enhanced with profile context (age, needs, family situation)
+- Top 3-5 most relevant policy chunks retrieved from vector database
+- Retrieved policy context injected into LLM prompt
+- LLM generates responses using ONLY retrieved policy information
+- Policies presented naturally based on customer profile and retrieved context
 
 **Implementation Details**:
-- Policy CRUD operations via `PolicyService`
-- Policy data stored in PostgreSQL
-- Policies included in conversation context
-- LLM generates natural policy presentations
-- Relevance determined by customer profile matching
+- **Vector Database**: Policy documents stored as embeddings in Chroma/Pinecone/Qdrant
+- **Document Ingestion**: Policy documents ingested into knowledge base via `DocumentIngestionService`
+- **Semantic Search**: Query embeddings compared with policy document embeddings
+- **RAG Pipeline**: Query → Embedding → Vector Search → Retrieve Top-K → Inject into LLM Prompt
+- **Accuracy**: All policy information grounded in knowledge base documents
+- Relevance determined by semantic similarity and customer profile matching
 
 ## Related Requirements
-- **FR-2.1.1**: Comprehensive policy database
-- **FR-2.1.2**: Relevance-based ordering
-- **FR-2.1.3**: Initial policy count (2-3)
-- **FR-2.1.4**: Structured format
-- **FR-2.1.5**: Clear, jargon-free language
-- **FR-2.1.6**: Unique selling points
-- **FR-2.1.7**: Real examples
-- **FR-9.1**: Maintain policy database
+- **FR-2.1.1**: Comprehensive policy knowledge base (RAG-based)
+- **FR-2.1.2**: Retrieve policies using semantic search
+- **FR-2.1.3**: Relevance-based ordering
+- **FR-2.1.4**: Initial policy count (2-3)
+- **FR-2.1.5**: Structured format
+- **FR-2.1.6**: Clear, jargon-free language
+- **FR-2.1.7**: Unique selling points
+- **FR-2.1.8**: Real examples from knowledge base
+- **FR-9.1**: Maintain policy knowledge base (vector database)
+- **FR-9.4**: Support policy document ingestion
+- **FR-9.6**: Use semantic search for policy retrieval
 
 ## Dependencies
 - **Depends on**: US-003 (qualifying information)
@@ -165,9 +176,14 @@ So that **I can understand my options and make an informed decision**
 
 ## Implementation Considerations
 
-- ✅ Policy database schema designed and implemented (`Policy` model)
-- ✅ Policy matching/recommendation via customer profile
-- ✅ Policy presentation via LLM with context
-- ✅ Policy eligibility checking (age-based)
-- ✅ Dynamic example generation via LLM
-- ✅ Policy information caching (can be added for performance)
+- ✅ **RAG Architecture**: Vector database knowledge base for policy documents
+- ✅ **Document Ingestion**: Policy documents can be ingested into knowledge base
+- ✅ **Semantic Search**: Semantic similarity search for relevant policy retrieval
+- ✅ **Query Enhancement**: Customer profile context enhances retrieval queries
+- ✅ Policy matching/recommendation via semantic search and customer profile
+- ✅ Policy presentation via LLM with retrieved context (RAG-augmented)
+- ✅ Policy eligibility checking (metadata filtering during retrieval)
+- ✅ Dynamic example generation via LLM using retrieved policy information
+- ✅ Accuracy guarantees: All policy info grounded in knowledge base documents
+- ⚠️ Policy information caching (can be added for performance)
+- ⚠️ Knowledge base update process (document ingestion workflow)

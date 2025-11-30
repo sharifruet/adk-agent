@@ -78,11 +78,13 @@ So that **I can easily see differences and choose the best option for my needs**
 
 ## Technical Notes
 
-- Comparison via LLM with policy context
-- Policy data retrieved via `PolicyService`
-- Comparison criteria included in LLM prompts
-- Recommendation via LLM with customer profile
-- Structured comparison format via LLM response
+- **RAG-Based Comparison**: Policies retrieved from knowledge base using semantic search
+- Policy data retrieved via `PolicyService.search_policies()` from vector database
+- Comparison uses retrieved policy context from knowledge base
+- Comparison criteria included in LLM prompts with retrieved context
+- Recommendation via LLM with customer profile and retrieved policy information
+- Structured comparison format via LLM response using retrieved policy details
+- All comparison information grounded in knowledge base documents
 
 ## API Implementation
 
@@ -96,11 +98,14 @@ So that **I can easily see differences and choose the best option for my needs**
 - Structured comparison response format
 - Comparison templates
 
-**Implementation Details**:
-- Policy data available via `PolicyService`
-- LLM receives policy context for comparison
+**Implementation Details (RAG-Based)**:
+- Policy data retrieved via semantic search from knowledge base (`PolicyService.search_policies()`)
+- Top-k relevant policy documents retrieved from vector database
+- Retrieved policy context injected into LLM prompt for comparison
+- LLM compares policies using ONLY retrieved knowledge base information
 - Customer profile included for personalized recommendations
-- Comparison handled naturally via conversation
+- Comparison handled naturally via conversation using RAG-augmented responses
+- All comparison details grounded in actual policy documents from knowledge base
 
 ## Related Requirements
 - **FR-2.4.1**: Side-by-side comparison (2-4 policies)

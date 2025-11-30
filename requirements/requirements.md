@@ -3,15 +3,16 @@
 ## 1. Project Overview
 
 ### 1.1 Purpose
-This document defines the functional and non-functional requirements for an AI-powered life insurance sales agent application. The application will simulate human sales agent interactions, engage potential customers in conversations about life insurance policies, and facilitate lead generation and registration.
+This document defines the functional and non-functional requirements for an AI-powered life insurance sales agent application. The application is designed for a **specific insurance company** and uses a **custom knowledge base** containing that company's life insurance policies. The application will simulate human sales agent interactions, engage potential customers in conversations about the company's life insurance policies, and facilitate lead generation and registration.
 
 ### 1.2 Scope
 The application will:
 - Conduct text-based conversations with potential customers
-- Provide information about life insurance policies (company and competitor policies)
+- Provide information about the **specific insurance company's life insurance policies** using a custom knowledge base (RAG - Retrieval Augmented Generation)
 - Use persuasive conversation techniques similar to human sales agents
 - Collect customer information from interested prospects
 - Store lead information for follow-up and processing
+- **Focus primarily on the company's own policies** from the configured knowledge base
 
 ### 1.3 Out of Scope (Initial Phase)
 - Voice-based interactions (planned for Phase 2)
@@ -20,6 +21,7 @@ The application will:
 - Direct policy issuance
 - Integration with insurance company backends
 - Multi-language support (initially)
+- Comprehensive competitor policy database (limited competitor information may be available, but focus is on company's own policies)
 
 ---
 
@@ -27,9 +29,9 @@ The application will:
 
 ### 2.1 Primary Objectives
 1. **Lead Generation**: Engage potential customers and identify those interested in life insurance
-2. **Information Dissemination**: Educate customers about available life insurance policies
+2. **Information Dissemination**: Educate customers about the specific insurance company's available life insurance policies using a custom knowledge base
 3. **Data Collection**: Capture qualified lead information for sales team follow-up
-4. **Conversation Quality**: Maintain natural, persuasive conversations that mirror human sales agents
+4. **Conversation Quality**: Maintain natural, persuasive conversations that mirror human sales agents while accurately representing the company's policy offerings
 
 ### 2.2 Success Metrics
 - Number of leads generated per day/week
@@ -49,8 +51,8 @@ The application will:
 - **Behavior**: May be hesitant, ask questions, need reassurance
 
 ### 3.2 Secondary Persona: Insurance Company Admin/Sales Manager
-- **Goals**: Review collected leads, assign to sales team, track performance
-- **Needs**: Access to lead data, conversation transcripts, analytics
+- **Goals**: Review collected leads, assign to sales team, track performance, maintain and update policy knowledge base
+- **Needs**: Access to lead data, conversation transcripts, analytics, ability to update policy information in the knowledge base
 
 ---
 
@@ -69,10 +71,11 @@ The application will:
 
 ##### FR-1.2: Agent Identification and Transparency
 - **FR-1.2.1**: The system shall clearly identify itself as an AI-powered sales agent within the first 2-3 messages
-- **FR-1.2.2**: The system shall state its purpose: helping customers understand and choose life insurance policies
-- **FR-1.2.3**: The system shall maintain a consistent agent identity (name, role) throughout the conversation
-- **FR-1.2.4**: The system shall not misrepresent its capabilities or pretend to be human if directly asked
-- **FR-1.2.5**: The system shall provide reassurance about data privacy and how information will be used
+- **FR-1.2.2**: The system shall state its purpose: helping customers understand and choose life insurance policies from the specific insurance company
+- **FR-1.2.3**: The system shall identify the specific insurance company it represents in the introduction
+- **FR-1.2.4**: The system shall maintain a consistent agent identity (name, role, company affiliation) throughout the conversation
+- **FR-1.2.5**: The system shall not misrepresent its capabilities or pretend to be human if directly asked
+- **FR-1.2.6**: The system shall provide reassurance about data privacy and how information will be used
 
 ##### FR-1.3: Initial Qualifying Questions
 - **FR-1.3.1**: The system shall ask qualifying questions in a conversational, non-interrogative manner
@@ -99,10 +102,11 @@ The application will:
 #### FR-2: Policy Information
 
 ##### FR-2.1: Company Policy Presentation
-- **FR-2.1.1**: The system shall maintain a comprehensive database of all available company life insurance policies
-- **FR-2.1.2**: The system shall present policies in order of relevance to customer's stated needs and profile
-- **FR-2.1.3**: The system shall highlight 2-3 most suitable policies initially, avoiding information overload
-- **FR-2.1.4**: The system shall present policy information in a structured format:
+- **FR-2.1.1**: The system shall maintain a **custom knowledge base** (RAG-based) containing all available company life insurance policies specific to the insurance company
+- **FR-2.1.2**: The system shall retrieve policy information from the configured knowledge base using semantic search and retrieval augmented generation (RAG)
+- **FR-2.1.3**: The system shall present policies in order of relevance to customer's stated needs and profile
+- **FR-2.1.4**: The system shall highlight 2-3 most suitable policies initially, avoiding information overload
+- **FR-2.1.5**: The system shall present policy information in a structured format:
   - Policy name and type (term, whole life, universal, etc.)
   - Key features and benefits (bullet points)
   - Coverage amount range (minimum and maximum)
@@ -111,16 +115,18 @@ The application will:
   - Age eligibility requirements
   - Medical examination requirements
   - Claim processing information
-- **FR-2.1.5**: The system shall use clear, jargon-free language, defining technical terms when first introduced
-- **FR-2.1.6**: The system shall emphasize unique selling points of company policies compared to competitors
-- **FR-2.1.7**: The system shall provide real examples or scenarios relevant to customer's situation
+- **FR-2.1.6**: The system shall use clear, jargon-free language, defining technical terms when first introduced
+- **FR-2.1.7**: The system shall emphasize unique selling points of the company's policies
+- **FR-2.1.8**: The system shall provide real examples or scenarios relevant to customer's situation based on knowledge base content
+- **FR-2.1.9**: The system shall ensure all policy information retrieved from the knowledge base is accurate and up-to-date
 
-##### FR-2.2: Competitor Policy Information
-- **FR-2.2.1**: The system shall provide accurate information about competitor policies when asked or when relevant for comparison
-- **FR-2.2.2**: The system shall maintain fairness and accuracy when discussing competitor policies (avoid false claims)
-- **FR-2.2.3**: The system shall use competitor information strategically to highlight company policy advantages
-- **FR-2.2.4**: The system shall compare competitor policies only when customer requests comparison or shows interest
-- **FR-2.2.5**: The system shall acknowledge when it doesn't have specific information about a competitor policy and offer to research
+##### FR-2.2: Competitor Policy Information (Optional/Limited)
+- **FR-2.2.1**: The system **may** provide general information about competitor policies when asked, but this is **not the primary focus**
+- **FR-2.2.2**: If competitor information is available in the knowledge base, the system shall maintain fairness and accuracy when discussing competitor policies (avoid false claims)
+- **FR-2.2.3**: The system shall redirect focus to the company's own policies when appropriate, using company policy advantages
+- **FR-2.2.4**: The system shall prioritize presenting company policies over competitor information
+- **FR-2.2.5**: The system shall acknowledge when it doesn't have specific information about competitor policies and redirect customer to company's offerings
+- **FR-2.2.6**: Competitor policy information is optional and may not be included in the knowledge base; the system's primary responsibility is to present the company's own policies
 
 ##### FR-2.3: Detailed Policy Explanation
 - **FR-2.3.1**: The system shall explain each policy feature in context of customer benefits (benefit-focused selling)
@@ -132,7 +138,7 @@ The application will:
 - **FR-2.3.7**: The system shall address policy flexibility (ability to increase coverage, add riders, change beneficiaries)
 
 ##### FR-2.4: Policy Comparison
-- **FR-2.4.1**: The system shall enable side-by-side comparison of 2-4 policies when requested
+- **FR-2.4.1**: The system shall enable side-by-side comparison of 2-4 **company policies** when requested
 - **FR-2.4.2**: The system shall compare policies using consistent criteria:
   - Coverage amounts and flexibility
   - Premium costs
@@ -140,17 +146,19 @@ The application will:
   - Benefits and features
   - Eligibility requirements
   - Cash value/returns (if applicable)
-- **FR-2.4.2**: The system shall highlight differences clearly and explain which policy might be better for specific customer needs
-- **FR-2.4.3**: The system shall provide recommendations based on comparison, explaining reasoning
-- **FR-2.4.4**: The system shall handle comparison requests between company and competitor policies
+- **FR-2.4.3**: The system shall highlight differences clearly and explain which company policy might be better for specific customer needs
+- **FR-2.4.4**: The system shall provide recommendations based on comparison, explaining reasoning from the knowledge base
+- **FR-2.4.5**: The system shall focus on comparing different company policies rather than competitor comparisons (unless specifically requested and information is available)
 
 ##### FR-2.5: Accurate Policy Information
-- **FR-2.5.1**: The system shall ensure all policy information provided is accurate and up-to-date
-- **FR-2.5.2**: The system shall access the most current policy database/API for real-time information
-- **FR-2.5.3**: The system shall acknowledge when policy information has changed or when uncertainty exists
-- **FR-2.5.4**: The system shall provide disclaimers when appropriate (e.g., "premiums may vary based on individual assessment")
-- **FR-2.5.5**: The system shall handle questions about policies not in the database by directing customer to contact sales team
-- **FR-2.5.6**: The system shall verify policy eligibility based on customer's age, location, and other qualifying factors before recommending
+- **FR-2.5.1**: The system shall ensure all policy information provided is accurate and up-to-date by retrieving from the configured knowledge base
+- **FR-2.5.2**: The system shall use RAG (Retrieval Augmented Generation) to retrieve relevant policy information from the custom knowledge base
+- **FR-2.5.3**: The knowledge base shall contain the specific insurance company's current policy information
+- **FR-2.5.4**: The system shall acknowledge when policy information is unavailable in the knowledge base or when uncertainty exists
+- **FR-2.5.5**: The system shall provide disclaimers when appropriate (e.g., "premiums may vary based on individual assessment")
+- **FR-2.5.6**: The system shall handle questions about policies not in the knowledge base by directing customer to contact sales team
+- **FR-2.5.7**: The system shall verify policy eligibility based on customer's age, location, and other qualifying factors before recommending, using knowledge base information
+- **FR-2.5.8**: The system shall support updating the knowledge base with new or updated policy information as needed
 
 ##### FR-2.6: Policy Question Handling
 - **FR-2.6.1**: The system shall answer specific questions about any policy accurately
@@ -180,7 +188,7 @@ The application will:
   - **Complexity objections**: "It's too complicated", "I don't understand", "Too many options"
   - **Trust objections**: "Is this legitimate?", "How do I know you're trustworthy?", "What if something happens?"
   - **Timing objections**: "I'll think about it", "Maybe later", "I'm not ready"
-  - **Comparison objections**: "Company X offers better rates", "I found cheaper options"
+  - **Comparison objections**: "Company X offers better rates", "I found cheaper options" - System should redirect to company's policy advantages based on knowledge base
 - **FR-3.2.2**: For cost objections, the system shall:
   - Acknowledge the concern empathetically
   - Break down costs into manageable perspectives (daily/monthly cost, cost per year of coverage)
@@ -198,10 +206,10 @@ The application will:
   - Provide analogies or simple examples
   - Reassure that the process will be made simple
 - **FR-3.2.5**: For trust objections, the system shall:
-  - Provide company credentials and legitimacy information
+  - Provide the specific insurance company's credentials and legitimacy information from the knowledge base
   - Offer transparency about process
   - Suggest speaking with human agent if preferred
-  - Provide testimonials or reviews (if available and verified)
+  - Provide testimonials or reviews (if available and verified in the knowledge base)
 - **FR-3.2.6**: For timing objections, the system shall:
   - Create appropriate urgency (age-related premium increases)
   - Address "what if" scenarios (health changes, unavailability)
@@ -394,13 +402,17 @@ The application will:
 - **FR-8.3**: The system shall validate email format (if provided)
 - **FR-8.4**: The system shall check for duplicate entries (by phone/NID)
 
-### 4.4 Policy Database
+### 4.4 Policy Knowledge Base
 
 #### FR-9: Policy Information Management
-- **FR-9.1**: The system shall maintain a database of company insurance policies
-- **FR-9.2**: The system shall maintain information about competitor policies
-- **FR-9.3**: The system shall include policy details: name, coverage, premiums, age requirements, benefits
-- **FR-9.4**: The system shall allow policy information updates
+- **FR-9.1**: The system shall maintain a **custom knowledge base** (RAG-based) containing the specific insurance company's life insurance policies
+- **FR-9.2**: The knowledge base shall be configured with company-specific policy documents, details, and information
+- **FR-9.3**: The system shall include comprehensive policy details in the knowledge base: name, coverage, premiums, age requirements, benefits, terms, conditions, exclusions
+- **FR-9.4**: The system shall support ingestion of policy documents into the knowledge base (vector store)
+- **FR-9.5**: The system shall allow updating the knowledge base when policy information changes or new policies are added
+- **FR-9.6**: The system shall use semantic search to retrieve relevant policy information from the knowledge base during conversations
+- **FR-9.7**: Competitor policy information is optional and may not be included in the knowledge base; focus is on the company's own policies
+- **FR-9.8**: The knowledge base configuration shall be specific to the insurance company using the application
 
 ---
 
@@ -444,10 +456,11 @@ The application will:
 
 #### 6.1.1 Core Technologies
 - **AI/ML Framework**: LLM-based conversational AI (e.g., GPT-4, Claude, or similar)
+- **RAG/Knowledge Base**: Vector database for storing and retrieving company policy information (e.g., Chroma, Pinecone, FAISS, or similar)
 - **Backend Framework**: Python (FastAPI/Flask) or Node.js (Express)
 - **Database**: 
-  - Primary: SQLite or PostgreSQL for structured data
-  - Alternative: JSON/text files for Phase 1 minimal implementation
+  - Primary: SQLite or PostgreSQL for structured data (leads, conversations, metadata)
+  - Vector Store: For policy knowledge base (embedded policy documents)
 - **Session Management**: In-memory or Redis for conversation state
 
 #### 6.1.2 Interfaces
@@ -476,18 +489,36 @@ Lead:
   - status: Enum (new, contacted, converted, not_interested)
 ```
 
-#### 6.2.2 Policy Schema
+#### 6.2.2 Policy Knowledge Base Schema
 ```
-Policy:
+Policy Document (in Vector Store):
+  - id: Unique identifier
+  - content: Text (policy description, terms, features, etc.)
+  - metadata: JSON/Object containing:
+    - policy_name: String (required)
+    - policy_type: String (term, whole_life, universal, etc.)
+    - company: String (specific insurance company name)
+    - coverage_amount_range: JSON/Object (min, max)
+    - premium_range: JSON/Object (min, max)
+    - age_requirements: JSON/Object (min_age, max_age)
+    - benefits: Array of Strings
+    - features: Array of Strings
+    - eligibility_requirements: Array of Strings
+    - document_source: String (original document/file name)
+    - last_updated: DateTime
+  - embedding: Vector (semantic embedding for retrieval)
+
+Policy Metadata (in Database - optional cache):
   - id: Unique identifier
   - name: String (required)
-  - company: String (own_company or competitor name)
+  - company: String (specific insurance company name)
   - coverage_amount_range: JSON/Object (min, max)
   - premium_range: JSON/Object (min, max)
   - age_requirements: JSON/Object (min_age, max_age)
   - benefits: Array of Strings
   - description: Text
   - features: Array of Strings
+  - active: Boolean (whether policy is currently available)
   - created_at: DateTime
   - updated_at: DateTime
 ```
@@ -644,9 +675,16 @@ Message:
 - Include headers and structured format
 - Enable easy import into database later
 
-### 9.2 Data Retention
+### 9.2 Knowledge Base Storage
+- **Vector Database**: Store policy documents and information in a vector database (e.g., Chroma, Pinecone, FAISS) for semantic search and RAG
+- **Policy Documents**: Ingest company-specific policy documents, brochures, terms & conditions into the vector store
+- **Metadata Storage**: Maintain policy metadata (names, IDs, basic info) in traditional database for quick lookup
+- **Updates**: Support incremental updates to knowledge base when policies change or new policies are added
+
+### 9.3 Data Retention
 - Store all leads indefinitely (or per company policy)
 - Store conversation logs for at least 90 days
+- Maintain policy knowledge base with versioning to track policy changes over time
 - Enable data archiving for old records
 
 ---
@@ -737,13 +775,19 @@ Message:
 
 ### 15.1 Assumptions
 - Customers will interact via text-based interface in Phase 1
-- Policy information will be maintained manually or via admin interface
+- **Policy information will be maintained in a custom knowledge base (RAG system) specific to the insurance company**
+- **The knowledge base will contain the specific insurance company's policies and can be updated as needed**
+- Policy documents will be ingested into the vector database/knowledge base
 - Internet connectivity will be available
 - AI model API access will be available and reliable
+- The application is configured for a specific insurance company, not a generic multi-company platform
 
 ### 15.2 Dependencies
 - Access to LLM API (OpenAI, Anthropic, etc.) or local LLM
-- Database software
+- Vector database/embedding system for RAG knowledge base (e.g., Chroma, Pinecone, FAISS)
+- Policy documents from the specific insurance company to populate the knowledge base
+- Database software (PostgreSQL/SQLite) for leads and conversation metadata
+- Embedding model for generating vector embeddings of policy documents
 - Web server (if web-based interface)
 - Development and deployment infrastructure
 

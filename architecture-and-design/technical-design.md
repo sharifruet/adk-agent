@@ -978,78 +978,558 @@ class LeadService:
 
 ---
 
-### 2.5 Policy Management Service
+### 2.5 Policy Management Service (RAG-Based)
 
-#### 2.5.1 Policy Matching Algorithm
+#### 2.5.1 RAG-Based Policy Retrieval
+
+The Policy Management Service uses Retrieval Augmented Generation (RAG) to retrieve relevant policy information from a custom knowledge base containing the specific insurance company's policy documents.
 
 ```python
+from typing import List, Dict, Optional
+from rag.retriever import get_retriever
+from rag.ingest import ingest_documents
+from embedding_service import EmbeddingService
+
 class PolicyService:
-    def __init__(self, policy_repository: PolicyRepository):
-        self.policy_repository = policy_repository
-    
-    async def get_relevant_policies(
+    def __init__(
         self,
-        customer_profile: CustomerProfile
-    ) -> List[Policy]:
-        """Get policies relevant to customer profile"""
-        
-        # Get all active policies
-        all_policies = await self.policy_repository.find_all(active=True)
-        
-        # Score and rank policies
-        scored_policies = []
-        
-        for policy in all_policies:
-            score = self._calculate_relevance_score(policy, customer_profile)
-            if score > 0:  # Only include policies with positive score
-                scored_policies.append((policy, score))
-        
-        # Sort by score (highest first)
-        scored_policies.sort(key=lambda x: x[1], reverse=True)
-        
-        # Return top 3-5 policies
-        return [p[0] for p in scored_policies[:5]]
+        vector_db_client,  # Chroma, Pinecone, or Qdrant client
+        embedding_service: EmbeddingService,
+        policy_metadata_repo: PolicyMetadataRepository  # For quick lookups
+    ):
+        self.vector_db = vector_db_client
+        self.embedding_service = embedding_service
+        self.metadata_repo = policy_metadata_repo
+        self.retriever = get_retriever()
     
-    def _calculate_relevance_score(
+    async def search_policies(
         self,
-        policy: Policy,
-        profile: CustomerProfile
-    ) -> float:
-        """Calculate how relevant a policy is to customer"""
+        query: str,
+        customer_profile: Optional[CustomerProfile] = None,
+        top_k: int = 5
+    ) -> List[RetrievedPolicy]:
+        """
+        Search policies using semantic search (RAG).
         
-        score = 0.0
-        
-        # Age eligibility check
-        if profile.age:
-            age_req = policy.age_requirements
-            if age_req.min_age <= profile.age <= age_req.max_age:
-                score += 10.0
-            else:
-                return 0.0  # Not eligible
-        
-        # Purpose matching
-        if profile.purpose:
-            purpose_keywords = {
-                "family protection": ["family", "children", "spouse"],
-                "debt coverage": ["mortgage", "loan", "debt"],
-                "estate planning": ["estate", "inheritance", "wealth"],
-                "business": ["business", "partnership"]
-            }
+        Args:
+            query: Natural language query from customer
+            customer_profile: Optional customer profile for context
+            top_k: Number of results to return
             
-            for keyword in purpose_keywords.get(profile.purpose, []):
-                if keyword in policy.description.lower():
-                    score += 5.0
+        Returns:
+            List of retrieved policy documents with metadata
+        """
+        # 1. Build enhanced query with customer context
+        enhanced_query = self._build_enhanced_query(query, customer_profile)
         
-        # Coverage amount matching
-        if profile.coverage_amount_interest:
-            # Parse customer's interest range and match to policy range
-            score += 3.0
+        # 2. Generate query embedding
+        query_embedding = await self.embedding_service.embed(enhanced_query)
         
-        # Company policy boost
-        if policy.company == "own_company":
-            score += 2.0
+        # 3. Perform semantic search in vector database
+        results = await self.vector_db.query(
+            query_embeddings=[query_embedding],
+            n_results=top_k,
+            include_metadata=True,
+            include_documents=True
+        )
         
-        return score
+        # 4. Filter by metadata if customer profile provided
+        if customer_profile:
+            results = self._filter_by_eligibility(results, customer_profile)
+        
+        # 5. Format and return retrieved policies
+        return self._format_retrieved_policies(results)
+    
+    def _build_enhanced_query(
+        self,
+        base_query: str,
+        customer_profile: Optional[CustomerProfile]
+    ) -> str:
+        """Enhance query with customer profile context"""
+        if not customer_profile:
+            return base_query
+        
+        context_parts = [base_query]
+        
+        if customer_profile.age:
+            context_parts.append(f"age {customer_profile.age}")
+        
+        if customer_profile.purpose:
+            context_parts.append(f"for {customer_profile.purpose}")
+        
+        if customer_profile.family_situation:
+            context_parts.append(f"family situation: {customer_profile.family_situation}")
+        
+        if customer_profile.coverage_amount_interest:
+            context_parts.append(f"coverage amount: {customer_profile.coverage_amount_interest}")
+        
+        return " ".join(context_parts)
+    
+    def _filter_by_eligibility(
+        self,
+        results: Dict,
+        customer_profile: CustomerProfile
+    ) -> Dict:
+        """Filter results by age eligibility and other criteria"""
+        if not customer_profile.age:
+            return results
+        
+        filtered_ids = []
+        filtered_embeddings = []
+        filtered_metadatas = []
+        filtered_documents = []
+        filtered_distances = []
+        
+        for i, metadata in enumerate(results.get('metadatas', [[]])[0]):
+            # Check age eligibility
+            if metadata.get('min_age') and customer_profile.age < metadata['min_age']:
+                continue
+            if metadata.get('max_age') and customer_profile.age > metadata['max_age']:
+                continue
+            
+            # Include this result
+            filtered_ids.append(results['ids'][0][i])
+            if results.get('embeddings'):
+                filtered_embeddings.append(results['embeddings'][0][i])
+            filtered_metadatas.append(metadata)
+            filtered_documents.append(results['documents'][0][i])
+            if results.get('distances'):
+                filtered_distances.append(results['distances'][0][i])
+        
+        return {
+            'ids': [filtered_ids],
+            'embeddings': [filtered_embeddings] if filtered_embeddings else None,
+            'metadatas': [filtered_metadatas],
+            'documents': [filtered_documents],
+            'distances': [filtered_distances] if filtered_distances else None
+        }
+    
+    def _format_retrieved_policies(self, results: Dict) -> List[RetrievedPolicy]:
+        """Format vector DB results into RetrievedPolicy objects"""
+        retrieved_policies = []
+        
+        for i in range(len(results.get('ids', [[]])[0])):
+            metadata = results['metadatas'][0][i]
+            document = results['documents'][0][i]
+            distance = results.get('distances', [[]])[0][i] if results.get('distances') else None
+            
+            retrieved_policies.append(RetrievedPolicy(
+                content=document,
+                metadata=metadata,
+                similarity_score=1.0 - distance if distance else None,
+                source=metadata.get('source', 'unknown'),
+                policy_id=metadata.get('policy_id'),
+                policy_name=metadata.get('policy_name'),
+                policy_type=metadata.get('policy_type')
+            ))
+        
+        return retrieved_policies
+    
+    async def get_policy_details(
+        self,
+        policy_id: str
+    ) -> Optional[PolicyDetails]:
+        """Get full policy details by ID"""
+        # First check metadata repository for quick lookup
+        metadata = await self.metadata_repo.find_by_id(policy_id)
+        if not metadata:
+            return None
+        
+        # Retrieve full policy document from vector DB
+        results = await self.vector_db.get(
+            ids=[policy_id],
+            include_metadata=True,
+            include_documents=True
+        )
+        
+        if not results.get('documents'):
+            return None
+        
+        return PolicyDetails(
+            id=policy_id,
+            name=metadata.name,
+            content=results['documents'][0],
+            metadata=results['metadatas'][0] if results.get('metadatas') else metadata.to_dict()
+        )
+    
+    async def compare_policies(
+        self,
+        policy_ids: List[str]
+    ) -> PolicyComparison:
+        """Compare multiple policies"""
+        policies = []
+        for policy_id in policy_ids:
+            policy = await self.get_policy_details(policy_id)
+            if policy:
+                policies.append(policy)
+        
+        return PolicyComparison(
+            policies=policies,
+            comparison_criteria=[
+                'coverage_range',
+                'premium_range',
+                'age_requirements',
+                'benefits',
+                'features'
+            ]
+        )
+```
+
+#### 2.5.2 Document Ingestion Service
+
+```python
+from typing import List, Tuple
+from pathlib import Path
+import json
+
+class DocumentIngestionService:
+    def __init__(
+        self,
+        vector_db_client,
+        embedding_service: EmbeddingService,
+        chunking_service: ChunkingService
+    ):
+        self.vector_db = vector_db_client
+        self.embedding_service = embedding_service
+        self.chunking_service = chunking_service
+    
+    async def ingest_policy_document(
+        self,
+        document_path: str,
+        metadata: Dict,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 200
+    ) -> List[str]:
+        """
+        Ingest a policy document into the knowledge base.
+        
+        Args:
+            document_path: Path to policy document (PDF, text, etc.)
+            metadata: Policy metadata (name, type, coverage range, etc.)
+            chunk_size: Size of each chunk in tokens
+            chunk_overlap: Overlap between chunks in tokens
+            
+        Returns:
+            List of chunk IDs created
+        """
+        # 1. Load and extract text from document
+        text = await self._load_document(document_path)
+        
+        # 2. Split document into chunks
+        chunks = self.chunking_service.chunk_text(
+            text=text,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap
+        )
+        
+        # 3. Generate embeddings for each chunk
+        chunk_embeddings = await self.embedding_service.embed_batch(
+            [chunk.content for chunk in chunks]
+        )
+        
+        # 4. Prepare metadata for each chunk
+        chunk_metadatas = []
+        chunk_ids = []
+        
+        for i, chunk in enumerate(chunks):
+            chunk_metadata = {
+                **metadata,  # Include original metadata
+                'chunk_index': i,
+                'chunk_count': len(chunks),
+                'source': document_path,
+                'chunk_size': len(chunk.content)
+            }
+            chunk_metadatas.append(chunk_metadata)
+            chunk_ids.append(f"{metadata.get('policy_id', 'unknown')}_chunk_{i}")
+        
+        # 5. Store in vector database
+        await self.vector_db.add(
+            ids=chunk_ids,
+            embeddings=chunk_embeddings,
+            documents=[chunk.content for chunk in chunks],
+            metadatas=chunk_metadatas
+        )
+        
+        return chunk_ids
+    
+    async def _load_document(self, document_path: str) -> str:
+        """Load text from document (supports PDF, text, markdown)"""
+        path = Path(document_path)
+        
+        if path.suffix == '.pdf':
+            return await self._extract_pdf_text(path)
+        elif path.suffix in ['.txt', '.md']:
+            return path.read_text(encoding='utf-8')
+        elif path.suffix == '.json':
+            data = json.loads(path.read_text())
+            return self._json_to_text(data)
+        else:
+            raise ValueError(f"Unsupported file format: {path.suffix}")
+    
+    async def _extract_pdf_text(self, path: Path) -> str:
+        """Extract text from PDF using PyPDF2 or pdfplumber"""
+        # Implementation using pdfplumber or PyPDF2
+        import pdfplumber
+        text_parts = []
+        with pdfplumber.open(path) as pdf:
+            for page in pdf.pages:
+                text_parts.append(page.extract_text())
+        return "\n\n".join(text_parts)
+    
+    def _json_to_text(self, data: Dict) -> str:
+        """Convert structured JSON policy data to text"""
+        text_parts = []
+        
+        if 'name' in data:
+            text_parts.append(f"Policy Name: {data['name']}")
+        if 'description' in data:
+            text_parts.append(f"Description: {data['description']}")
+        if 'benefits' in data:
+            text_parts.append(f"Benefits: {', '.join(data['benefits'])}")
+        if 'features' in data:
+            text_parts.append(f"Features: {', '.join(data['features'])}")
+        
+        return "\n\n".join(text_parts)
+```
+
+#### 2.5.3 Chunking Service
+
+```python
+from typing import List
+from dataclasses import dataclass
+
+@dataclass
+class TextChunk:
+    content: str
+    start_index: int
+    end_index: int
+    chunk_index: int
+
+class ChunkingService:
+    def __init__(self, tokenizer):
+        self.tokenizer = tokenizer  # tiktoken, transformers, etc.
+    
+    def chunk_text(
+        self,
+        text: str,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 200
+    ) -> List[TextChunk]:
+        """
+        Split text into overlapping chunks.
+        
+        Args:
+            text: Input text to chunk
+            chunk_size: Target chunk size in tokens
+            chunk_overlap: Overlap between chunks in tokens
+            
+        Returns:
+            List of text chunks
+        """
+        # Tokenize text
+        tokens = self.tokenizer.encode(text)
+        
+        chunks = []
+        start_idx = 0
+        chunk_index = 0
+        
+        while start_idx < len(tokens):
+            # Calculate end index
+            end_idx = min(start_idx + chunk_size, len(tokens))
+            
+            # Extract chunk tokens
+            chunk_tokens = tokens[start_idx:end_idx]
+            
+            # Decode back to text
+            chunk_text = self.tokenizer.decode(chunk_tokens)
+            
+            # Create chunk object
+            chunk = TextChunk(
+                content=chunk_text,
+                start_index=start_idx,
+                end_index=end_idx,
+                chunk_index=chunk_index
+            )
+            chunks.append(chunk)
+            
+            # Move start index with overlap
+            start_idx = end_idx - chunk_overlap
+            chunk_index += 1
+        
+        return chunks
+```
+
+#### 2.5.4 Embedding Service
+
+```python
+from typing import List, Optional
+import os
+import openai
+from sentence_transformers import SentenceTransformer
+
+class EmbeddingService:
+    def __init__(
+        self,
+        provider: str = "sentence_transformers",  # Default: FREE local model for development
+        model: str = "all-MiniLM-L6-v2",  # Default: FREE Sentence Transformers model
+        api_key: Optional[str] = None
+    ):
+        """
+        Embedding service supporting multiple providers with easy switching.
+        
+        Providers:
+        - "sentence_transformers": FREE local model (development)
+        - "voyage": Voyage AI API (production - recommended: voyage-3.5-lite)
+        - "openai": OpenAI API (production alternative)
+        
+        For development: Use "sentence_transformers" with "all-MiniLM-L6-v2" (FREE)
+        For production: Use "voyage" with "voyage-3.5-lite" (recommended) or "openai"
+        """
+        self.provider = provider
+        self.model = model
+        
+        if provider == "sentence_transformers":
+            # FREE local embedding model - recommended for development
+            model_name = model if model != "all-MiniLM-L6-v2" else "all-MiniLM-L6-v2"
+            self.embedding_model = SentenceTransformer(model_name)
+            # Model downloads automatically on first use (~80MB for all-MiniLM-L6-v2)
+            self.dimension = self.embedding_model.get_sentence_embedding_dimension()
+            
+        elif provider == "voyage":
+            # Voyage AI API - recommended for production
+            try:
+                import voyageai
+            except ImportError:
+                raise ImportError(
+                    "voyageai package required. Install with: pip install voyageai"
+                )
+            
+            api_key = api_key or os.getenv("VOYAGE_API_KEY")
+            if not api_key:
+                raise ValueError("VOYAGE_API_KEY environment variable required for Voyage AI")
+            
+            self.client = voyageai.Client(api_key=api_key)
+            # voyage-3.5-lite supports dimensions: 256, 512, 1024, 2048
+            # Default to 1024 for good balance of quality and cost
+            self.dimension = 1024  # Can be configured via model parameter
+            
+        elif provider == "openai":
+            # OpenAI API - alternative for production
+            api_key = api_key or os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY environment variable required for OpenAI")
+            
+            self.client = openai.OpenAI(api_key=api_key)
+            # OpenAI embedding dimensions vary by model
+            self.dimension = self._get_openai_dimension(model)
+            
+        else:
+            raise ValueError(
+                f"Unsupported embedding provider: {provider}. "
+                "Supported: 'sentence_transformers' (free), 'voyage' (production), or 'openai' (production)"
+            )
+    
+    def _get_openai_dimension(self, model: str) -> int:
+        """Get embedding dimension for OpenAI model"""
+        dimensions = {
+            "text-embedding-3-small": 1536,
+            "text-embedding-3-large": 3072,
+            "text-embedding-ada-002": 1536,
+        }
+        return dimensions.get(model, 1536)
+    
+    def embed(
+        self, 
+        text: str,
+        input_type: Optional[str] = None
+    ) -> List[float]:
+        """
+        Generate embedding for a single text.
+        
+        Args:
+            text: Input text to embed
+            input_type: For Voyage AI, can be "document" or "query" (optional)
+        """
+        if self.provider == "sentence_transformers":
+            # FREE local embedding - synchronous, no API call
+            return self.embedding_model.encode(text).tolist()
+            
+        elif self.provider == "voyage":
+            # Voyage AI API call
+            result = self.client.embed(
+                texts=[text],
+                model=self.model,  # e.g., "voyage-3.5-lite"
+                input_type=input_type  # "document" or "query" for voyage-3.5-lite
+            )
+            return result.embeddings[0]
+            
+        elif self.provider == "openai":
+            # OpenAI API call
+            response = self.client.embeddings.create(
+                model=self.model,
+                input=text
+            )
+            return response.data[0].embedding
+    
+    def embed_batch(
+        self, 
+        texts: List[str],
+        input_type: Optional[str] = None
+    ) -> List[List[float]]:
+        """
+        Generate embeddings for multiple texts.
+        
+        Args:
+            texts: List of texts to embed
+            input_type: For Voyage AI, can be "document" or "query" (optional)
+        """
+        if self.provider == "sentence_transformers":
+            # FREE local batch embedding - very fast
+            embeddings = self.embedding_model.encode(texts, show_progress_bar=False)
+            return embeddings.tolist()
+            
+        elif self.provider == "voyage":
+            # Voyage AI batch API call
+            result = self.client.embed(
+                texts=texts,
+                model=self.model,  # e.g., "voyage-3.5-lite"
+                input_type=input_type  # "document" or "query" for voyage-3.5-lite
+            )
+            return result.embeddings
+            
+        elif self.provider == "openai":
+            # OpenAI batch API call
+            response = self.client.embeddings.create(
+                model=self.model,
+                input=texts
+            )
+            return [item.embedding for item in response.data]
+    
+    @property
+    def embedding_dimension(self) -> int:
+        """Get the embedding dimension for the current model"""
+        return self.dimension
+
+# Usage Examples:
+# 
+# For local development (FREE):
+# service = EmbeddingService(provider="sentence_transformers", model="all-MiniLM-L6-v2")
+# 
+# For production (Voyage AI - recommended):
+# service = EmbeddingService(
+#     provider="voyage",
+#     model="voyage-3.5-lite",
+#     api_key=os.getenv("VOYAGE_API_KEY")
+# )
+# 
+# For production (OpenAI - alternative):
+# service = EmbeddingService(
+#     provider="openai",
+#     model="text-embedding-3-small",
+#     api_key=os.getenv("OPENAI_API_KEY")
+# )
+#
+# Switching providers is easy - just change environment variables!
 ```
 
 ---

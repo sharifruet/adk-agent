@@ -205,6 +205,11 @@ lic-agent/
 |----------|-------------|----------|
 | **Development Environment Setup** | Complete local setup instructions | [`docs/development-environment-setup.md`](./docs/development-environment-setup.md) |
 | **Docker Setup Guide** | Docker Compose setup and management | [`docs/docker-setup.md`](./docs/docker-setup.md) |
+| **Current Policy Retrieval System** | How policies are currently stored and retrieved (pre-RAG) | [`docs/current-policy-retrieval-system.md`](./docs/current-policy-retrieval-system.md) |
+| **RAG vs Current System Comparison** | Detailed comparison of SQL-based vs RAG-based policy retrieval | [`docs/rag-vs-current-system-comparison.md`](./docs/rag-vs-current-system-comparison.md) |
+| **Free Embeddings Setup** | Guide for using FREE local embedding models (Sentence Transformers) | [`docs/free-embeddings-setup.md`](./docs/free-embeddings-setup.md) |
+| **Embedding Provider Configuration** | Guide for configuring Voyage AI, OpenAI, and Sentence Transformers | [`docs/embedding-provider-configuration.md`](./docs/embedding-provider-configuration.md) |
+| **RAG Knowledge Base Implementation Plan** | Phased implementation plan for RAG-based knowledge base | [`docs/rag-knowledge-base-implementation-plan.md`](./docs/rag-knowledge-base-implementation-plan.md) |
 
 ---
 
@@ -214,8 +219,10 @@ lic-agent/
 
 - **Backend**: Python 3.11+ with FastAPI
 - **Database**: PostgreSQL 13+ (SQLite for minimal dev setup)
+- **Knowledge Base**: Vector Database (Chroma/Pinecone/Qdrant) for RAG-based policy retrieval
 - **Cache/Sessions**: Redis 6+
 - **LLM**: Ollama (local dev) / OpenAI GPT-4 (production)
+- **Embeddings**: OpenAI embeddings or Sentence Transformers for semantic search
 - **Frontend**: React + TypeScript (to be implemented)
 
 ### Development Workflow
@@ -404,7 +411,7 @@ See [`docs/docker-setup.md`](./docs/docker-setup.md) for detailed Docker command
 
 ### 🚧 In Progress
 
-- [ ] Implementation (starting soon)
+- [ ] RAG Knowledge Base Implementation (see [Implementation Plan](./docs/rag-knowledge-base-implementation-plan.md))
 
 ### 📋 Planned
 
@@ -412,6 +419,15 @@ See [`docs/docker-setup.md`](./docs/docker-setup.md) for detailed Docker command
 - [ ] API Specification Document (OpenAPI/Swagger)
 - [ ] Test Strategy Document
 - [ ] Deployment Plan
+
+### 🎯 Current Focus: RAG Knowledge Base Architecture
+
+The system is being updated to use a **RAG-based custom knowledge base** for company-specific policy information:
+- ✅ Architecture documents updated for RAG
+- ✅ Requirements updated for knowledge base
+- ✅ User stories updated for RAG-based retrieval
+- 📋 Implementation plan created (14-week phased approach)
+- 🚧 Implementation starting (Phase 0: Foundation & Setup)
 
 ---
 

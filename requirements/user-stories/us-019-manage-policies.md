@@ -2,8 +2,8 @@
 
 ## User Story
 As an **admin**
-I want to **manage policy information in the system**
-So that **I can keep policy details up-to-date and add new policies**
+I want to **manage the policy knowledge base by ingesting and updating policy documents**
+So that **the AI agent has accurate, up-to-date company-specific policy information available for conversations**
 
 ## Acceptance Criteria
 
@@ -32,24 +32,37 @@ So that **I can keep policy details up-to-date and add new policies**
   - Created date, updated date
 - And information is clearly formatted
 
-### AC-019.3: Create New Policy
-- Given admin wants to add new policy
-- When creating policy
-- Then the system allows entering:
-  - Policy name (required)
-  - Provider/Company (required)
-  - Coverage amount (required, min 10000)
-  - Monthly premium (required, > 0)
-  - Term years (required, >= 1)
-  - Medical exam required (boolean, default false)
-- And system validates required fields
-- And policy is saved to database
+### AC-019.3: Ingest Policy Document into Knowledge Base
+- Given admin wants to add new policy to the knowledge base
+- When ingesting a policy document
+- Then the system allows:
+  - Uploading policy documents (PDF, text, markdown, JSON)
+  - Entering policy metadata:
+    - Policy name (required)
+    - Policy type (term, whole life, universal, etc.)
+    - Company name (specific insurance company)
+    - Coverage amount range (optional metadata)
+    - Premium range (optional metadata)
+    - Age eligibility requirements (optional metadata)
+- And system processes document:
+  - Extracts text from documents (PDF parsing, etc.)
+  - Splits document into chunks (500-1000 tokens with overlap)
+  - Generates embeddings for each chunk
+  - Stores embeddings and metadata in vector database
+- And policy becomes searchable in the knowledge base
 
-### AC-019.4: Update Policy Information
-- Given admin views policy details
-- When updating information
-- Then the system allows editing all policy fields
-- And system validates changes
+### AC-019.4: Update Policy in Knowledge Base
+- Given admin wants to update policy information
+- When updating a policy
+- Then the system allows:
+  - Re-ingesting updated policy document
+  - Updating policy metadata
+  - Marking old policy chunks as deprecated
+  - Creating new version of policy in knowledge base
+- And system handles:
+  - Version tracking (maintains old versions for reference)
+  - Smooth transition (new version available immediately)
+  - Deprecation of old chunks after verification period
 - And updated_at timestamp is updated
 - And change history is logged (optional)
 
@@ -116,11 +129,15 @@ So that **I can keep policy details up-to-date and add new policies**
 
 ## Technical Notes
 
-- Policy CRUD API via `PolicyService` and `PolicyRepository`
-- Policy database schema (`Policy` model)
-- Validation via Pydantic models (`PolicyCreate`)
+- **Knowledge Base Management**: Document ingestion service for policy documents
+- **Document Processing**: `DocumentIngestionService.ingest_policy_document()` processes documents
+- **Text Extraction**: PDF parsing, text extraction from various formats
+- **Chunking**: `ChunkingService` splits documents into manageable chunks (500-1000 tokens)
+- **Embedding Generation**: `EmbeddingService` creates vector embeddings for semantic search
+- **Vector Database**: Policy chunks stored in Chroma/Pinecone/Qdrant with metadata
+- **Version Control**: Track policy document versions in knowledge base
+- **Metadata Storage**: Policy metadata (name, type, coverage range, etc.) stored with chunks
 - Reference checking (can be added for leads using policy)
-- Soft delete vs hard delete logic (can be added)
 - Access control and logging (can be added)
 
 ## API Implementation
@@ -166,10 +183,11 @@ So that **I can keep policy details up-to-date and add new policies**
 - Admin authentication can be added for create/update
 
 ## Related Requirements
-- **FR-9.1**: Maintain company policy database
-- **FR-9.2**: Maintain competitor policy database
-- **FR-9.3**: Include policy details
-- **FR-9.4**: Allow policy updates
+- **FR-9.1**: Maintain policy knowledge base (RAG-based, vector database)
+- **FR-9.4**: Support ingestion of policy documents into knowledge base
+- **FR-9.5**: Allow updating knowledge base when policy information changes
+- **FR-9.6**: Use semantic search to retrieve relevant policy information
+- **FR-9.7**: Focus on company-specific policies (competitor info optional)
 
 ## Dependencies
 - **Depends on**: None (standalone admin feature, but foundational for US-004)

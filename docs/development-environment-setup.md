@@ -252,6 +252,18 @@ OLLAMA_MODEL=llama3  # or llama3.1, mistral, mixtral, etc.
 # ANTHROPIC_API_KEY=your-api-key-here
 # ANTHROPIC_MODEL=claude-3-opus-20240229
 
+# Embedding Configuration (FREE for development, Voyage AI for production)
+EMBEDDING_PROVIDER=sentence_transformers  # Options: sentence_transformers (free), voyage (production), openai (production)
+EMBEDDING_MODEL=all-MiniLM-L6-v2  # For sentence_transformers (free)
+# For production with Voyage AI (recommended):
+# EMBEDDING_PROVIDER=voyage
+# EMBEDDING_MODEL=voyage-3.5-lite
+# VOYAGE_API_KEY=your-voyage-api-key-here
+# For production with OpenAI (alternative):
+# EMBEDDING_PROVIDER=openai
+# EMBEDDING_MODEL=text-embedding-3-small
+# OPENAI_API_KEY=sk-your-api-key-here  # Already listed above
+
 LLM_TEMPERATURE=0.7
 LLM_MAX_TOKENS=500
 LLM_TIMEOUT=30

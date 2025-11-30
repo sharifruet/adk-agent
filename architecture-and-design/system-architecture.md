@@ -45,41 +45,62 @@ This document defines the system architecture for the AI Life Insurance Sales Ag
 
 The AI Life Insurance Sales Agent is a conversational AI application that:
 - Conducts natural, persuasive conversations with potential customers
-- Provides information about life insurance policies
+- Provides information about **a specific insurance company's life insurance policies** using a **custom knowledge base (RAG-based)**
 - Identifies interested prospects and collects lead information
 - Stores leads and conversation logs for sales team follow-up
 
 ### 2.2 Key System Characteristics
 
 - **Real-time conversational AI**: Uses LLM for natural language understanding and generation
+- **RAG-Based Knowledge Base**: Uses Retrieval Augmented Generation (RAG) with vector database for semantic search of company-specific policy information
+- **Custom Policy Knowledge Base**: Configured with the specific insurance company's policy documents, terms, and information
 - **Stateful conversations**: Maintains conversation context throughout sessions
 - **Lead generation focus**: Designed to convert conversations into qualified leads
 - **Text-based (Phase 1)**: Initial implementation supports text interactions only
 - **Scalable**: Designed to handle multiple concurrent conversations
 
+### 2.3 Why RAG Architecture?
+
+**Retrieval Augmented Generation (RAG) is the recommended architecture** for this application because:
+
+1. **Semantic Search**: Enables natural language queries to find relevant policies (e.g., "policies for young families" finds term life policies even if customer doesn't mention "term life")
+2. **Accurate Information**: Retrieves actual policy documents and details from the knowledge base, reducing hallucinations
+3. **Easy Updates**: New policies or policy changes can be ingested into the vector database without code changes
+4. **Context-Aware Responses**: LLM receives relevant policy context, enabling more accurate and specific answers
+5. **Scalability**: Vector databases efficiently handle semantic search across large policy document collections
+6. **Company-Specific**: Perfect fit for a custom knowledge base containing one insurance company's policies
+
+**Alternative Approaches Considered**:
+- **Rule-Based Matching**: Too rigid, requires constant updates, doesn't handle natural language queries well
+- **Traditional Database Queries**: Limited to exact matches, doesn't understand semantic similarity
+- **LLM Without RAG**: Higher risk of hallucinations, no way to ensure policy accuracy, harder to update
+
+**Conclusion**: RAG provides the best balance of accuracy, flexibility, and maintainability for company-specific policy information retrieval.
+
 ### 2.3 System Context
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    External Systems                          │
+│                    External Systems                         │
 ├─────────────────────────────────────────────────────────────┤
-│  • LLM API (OpenAI/Anthropic/Claude)                       │
+│  • LLM API (OpenAI/Anthropic/Claude)                        │
 │  • Customer Access (Web Browser/Chat Interface)             │
 │  • Admin Users (Web Dashboard)                              │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              AI Life Insurance Sales Agent                   │
-│                    Application                               │
+│              AI Life Insurance Sales Agent                  │
+│                    Application                              │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                  Data Storage                                │
+│                  Data Storage                               │
 ├─────────────────────────────────────────────────────────────┤
-│  • Database (PostgreSQL/SQLite)                             │
-│  • File Storage (Optional - Text/JSON)                       │
+│  • Database (PostgreSQL/SQLite) - Leads, Conversations      │
+│  • Vector Database (Chroma/Pinecone/FAISS) - Policy KB      │
+│  • File Storage (Optional - Text/JSON)                      │
 │  • Session Cache (Redis)                                    │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -116,54 +137,68 @@ The AI Life Insurance Sales Agent is a conversational AI application that:
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                    Presentation Layer                        │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │  Web Chat UI │  │  Admin UI    │  │  REST API    │      │
-│  │  (React/Vue) │  │  (Dashboard) │  │  Endpoints   │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │  Web Chat UI │  │  Admin UI    │  │  REST API    │        │
+│  │  (React/Vue) │  │  (Dashboard) │  │  Endpoints   │        │
+│  └──────────────┘  └──────────────┘  └──────────────┘        │
 └──────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                    Application Layer                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │ Conversation │  │ Lead Mgmt    │  │ Policy Mgmt │      │
-│  │   Service     │  │   Service    │  │   Service    │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   Session    │  │  Validation  │  │   Admin     │      │
-│  │   Manager    │  │   Service    │  │   Service   │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│                    Application Layer                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │ Conversation │  │ Lead Mgmt    │  │ Policy Mgmt  │        │
+│  │   Service    │  │   Service    │  │   Service    │        │
+│  └──────────────┘  └──────────────┘  └──────────────┘        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │   Session    │  │  Validation  │  │   Admin      │        │
+│  │   Manager    │  │   Service    │  │   Service    │        │
+│  └──────────────┘  └──────────────┘  └──────────────┘        │
 └──────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                    AI/LLM Integration Layer                     │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │  LLM Client  │  │  Prompt      │  │ Context      │      │
-│  │  (Adapter)   │  │  Manager     │  │  Manager     │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-│  ┌──────────────┐  ┌──────────────┐                        │
-│  │  Response     │  │  Intent       │                        │
-│  │  Filter      │  │  Detection    │                        │
-│  └──────────────┘  └──────────────┘                        │
+│                    AI/LLM Integration Layer                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │  LLM Client  │  │  Prompt      │  │ Context      │        │
+│  │  (Adapter)   │  │  Manager     │  │  Manager     │        │
+│  └──────────────┘  └──────────────┘  └──────────────┘        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │  Response    │  │  Intent      │  │  RAG         │        │
+│  │  Filter      │  │  Detection   │  │  Retriever   │        │
+│  └──────────────┘  └──────────────┘  └──────────────┘        │
 └──────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                    Data Access Layer                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │  Lead        │  │  Conversation│  │  Policy      │      │
-│  │  Repository  │  │  Repository  │  │  Repository   │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│                    Knowledge Base Layer (RAG)                │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │  Embedding   │  │  Vector      │  │  Document    │        │
+│  │  Generator   │  │  Search      │  │  Ingestor    │        │
+│  └──────────────┘  └──────────────┘  └──────────────┘        │
+│  ┌──────────────┐                                            │
+│  │  Policy      │                                            │
+│  │  Knowledge   │                                            │
+│  │  Base        │                                            │
+│  └──────────────┘                                            │
 └──────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                    Data Storage Layer                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │  PostgreSQL  │  │    Redis     │  │ File Storage │      │
-│  │  / SQLite    │  │  (Sessions)  │  │  (Optional)   │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│                    Data Access Layer                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │  Lead        │  │  Conversation│  │  Policy      │        │
+│  │  Repository  │  │  Repository  │  │  Repository  │        │
+│  └──────────────┘  └──────────────┘  └──────────────┘        │
+└──────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│                    Data Storage Layer                        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │  PostgreSQL  │  │    Redis     │  │ File Storage │        │
+│  │  / SQLite    │  │  (Sessions)  │  │  (Optional)  │        │
+│  └──────────────┘  └──────────────┘  └──────────────┘        │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -188,6 +223,13 @@ The AI Life Insurance Sales Agent is a conversational AI application that:
 - **Context Manager**: Conversation context window management
 - **Response Filter**: Safety and content filtering
 - **Intent Detection**: Customer intent classification
+- **RAG Retriever**: Retrieves relevant policy documents from knowledge base using semantic search
+
+#### 4.2.4 Knowledge Base Layer (RAG)
+- **Document Ingestor**: Ingests policy documents into vector database
+- **Embedding Generator**: Converts policy documents to vector embeddings
+- **Vector Search**: Performs semantic similarity search on policy knowledge base
+- **Policy Knowledge Base**: Vector database containing company-specific policy documents and information
 
 #### 4.2.4 Agent Orchestration (LangGraph)
 - **LangGraph Conversation Graph**: State machine built from nodes in `graph/nodes`
@@ -201,7 +243,8 @@ The AI Life Insurance Sales Agent is a conversational AI application that:
 - **Repositories**: Data access abstraction (Leads, Conversations, Policies)
 
 #### 4.2.5 Data Storage Layer
-- **PostgreSQL/SQLite**: Primary database
+- **PostgreSQL/SQLite**: Primary database for leads, conversations, metadata
+- **Vector Database**: Policy knowledge base (Chroma, Pinecone, FAISS, or similar)
 - **Redis**: Session and cache storage
 - **File Storage**: Optional text/JSON file storage (Phase 1)
 
@@ -299,16 +342,23 @@ class LLMProvider:
 ### 5.5 Policy Management Service
 
 **Responsibilities**:
-- Manage policy database
-- Retrieve policies for presentation
+- Manage policy knowledge base (RAG-based)
+- Retrieve policies using semantic search
 - Match policies to customer needs
 - Provide policy comparisons
+- Ingest new policy documents into knowledge base
 
 **Key Operations**:
-- `getPolicies(customerProfile)`: Get relevant policies
-- `getPolicyDetails(policyId)`: Get full policy information
+- `searchPolicies(query, customerProfile)`: Semantic search for relevant policies from knowledge base
+- `getPolicyDetails(policyId)`: Get full policy information from knowledge base
 - `comparePolicies(policyIds)`: Compare multiple policies
-- `updatePolicy(policyId, data)`: Admin policy updates
+- `ingestPolicyDocument(document, metadata)`: Add new policy document to knowledge base
+- `updatePolicyDocument(policyId, document)`: Update existing policy in knowledge base
+
+**RAG Integration**:
+- Uses vector database for semantic search
+- Retrieves top-k relevant policy documents based on customer query
+- Provides retrieved context to LLM for accurate policy information
 
 ### 5.6 Data Access Layer (Repositories)
 
@@ -378,7 +428,68 @@ class LeadRepository:
 - Good for local development
 - Easy migration path to PostgreSQL
 
-#### 6.1.4 Session/Cache Store
+#### 6.1.4 Vector Database (Knowledge Base)
+
+**Primary Options for Policy Knowledge Base**:
+
+1. **Chroma** (Recommended for Development)
+   - Pros: Easy setup, Python-native, open source, good for local development
+   - Cons: Limited scalability for very large datasets
+   - Best for: Development and small to medium production deployments
+
+2. **Pinecone** (Recommended for Production)
+   - Pros: Managed service, highly scalable, production-ready, fast
+   - Cons: Cost, external dependency
+   - Best for: Production environments with high traffic
+
+3. **FAISS (Facebook AI Similarity Search)**
+   - Pros: Very fast, open source, good performance
+   - Cons: Requires more setup, in-memory or file-based
+   - Best for: High-performance requirements, on-premise deployments
+
+4. **Qdrant**
+   - Pros: Open source, scalable, good API
+   - Cons: Requires self-hosting setup
+   - Best for: Production with self-hosted infrastructure
+
+**Embedding Models**:
+
+**For Local Development (FREE - Recommended):**
+- **Sentence Transformers (all-MiniLM-L6-v2)**: 
+  - ✅ **100% FREE** - No API costs, no usage limits
+  - ✅ Open source, runs locally on your machine
+  - ✅ Good quality for development (384-dimensional embeddings)
+  - ✅ Fast inference on CPU, no internet required
+  - ✅ Installation: `pip install sentence-transformers`
+  - ✅ Model size: ~80MB (downloads automatically on first use)
+
+**For Production (Recommended):**
+- **Voyage AI voyage-3.5-lite**: 
+  - ✅ **Recommended for production** - Excellent quality and cost efficiency
+  - ✅ High-quality embeddings (supports 256, 512, 1024, 2048 dimensions)
+  - ✅ Optimized for retrieval tasks
+  - ✅ Lower cost than OpenAI with better performance
+  - ✅ Supports input_type parameter ("document" vs "query") for better retrieval
+  - ✅ Installation: `pip install voyageai`
+  - ✅ Requires: `VOYAGE_API_KEY` environment variable
+
+**For Production (Alternative):**
+- **OpenAI text-embedding-3-small** or **text-embedding-ada-002**: 
+  - Excellent quality, requires API key (~$0.02 per 1M tokens)
+  - Can be used as alternative to Voyage AI
+  - Requires: `OPENAI_API_KEY` environment variable
+
+**Provider Switching:**
+- All providers use the same `EmbeddingService` interface
+- Switch via environment variable: `EMBEDDING_PROVIDER=sentence_transformers|voyage|openai`
+- No code changes needed when switching providers
+
+**Recommendation**: 
+- **Development**: Use Sentence Transformers (FREE) - perfect for local development with zero costs
+- **Production**: Use Voyage AI voyage-3.5-lite (recommended) - best balance of quality and cost
+- **Alternative**: OpenAI embeddings if Voyage AI not available
+
+#### 6.1.5 Session/Cache Store
 
 **Redis**
 - Fast in-memory storage
@@ -390,7 +501,7 @@ class LeadRepository:
 - Simple for local development
 - No infrastructure required
 
-#### 6.1.5 Frontend Framework
+#### 6.1.6 Frontend Framework
 
 **Primary: React with TypeScript**
 - Component-based architecture
@@ -402,7 +513,7 @@ class LeadRepository:
 - Easier learning curve
 - Good documentation
 
-#### 6.1.6 Additional Technologies
+#### 6.1.7 Additional Technologies
 
 - **Authentication**: JWT tokens
 - **API Documentation**: OpenAPI/Swagger (FastAPI auto-generates)
@@ -433,9 +544,16 @@ AI/LLM:
 ├── LangChain (runnables, retrievers)
 └── Prompt engineering framework
 
+Knowledge Base (RAG):
+├── Vector Database (Chroma/Pinecone/Qdrant)
+├── Embedding Model (OpenAI/Sentence Transformers)
+├── Document Processing (chunking, metadata extraction)
+└── Semantic Search Engine
+
 Database:
-├── PostgreSQL (production)
-├── SQLite (development)
+├── PostgreSQL (production) - Leads, conversations, metadata
+├── SQLite (development) - Leads, conversations, metadata
+├── Vector Database - Policy knowledge base
 └── Redis (session/cache)
 
 Infrastructure:
@@ -553,7 +671,7 @@ Customer Message
        ▼
 ┌──────────────┐
 │ Conversation │
-│   Service     │
+│   Service    │
 └──────────────┘
        │
        ├──► Session Manager (load context)
@@ -561,25 +679,25 @@ Customer Message
        ▼
 ┌──────────────┐
 │ Context      │
-│ Manager       │
+│ Manager      │
 └──────────────┘
        │
        ▼ Build context (messages + profile + policies)
 ┌──────────────┐
 │ LLM Client   │
-│  (Adapter)    │
+│  (Adapter)   │
 └──────────────┘
        │
        ▼ HTTP POST to LLM API
 ┌──────────────┐
-│  LLM Provider │
-│   (External)  │
+│ LLM Provider │
+│  (External)  │
 └──────────────┘
        │
        ▼ Response
 ┌──────────────┐
 │ Response     │
-│ Filter        │
+│ Filter       │
 └──────────────┘
        │
        ├──► Session Manager (save message + context)
@@ -588,7 +706,7 @@ Customer Message
        ▼
 ┌──────────────┐
 │  Conversation│
-│   Service     │
+│   Service    │
 └──────────────┘
        │
        ├──► Detect Intent/Interest
@@ -602,7 +720,7 @@ Customer Message
        │
        ▼ HTTP Response
 ┌──────────────┐
-│  Chat UI       │
+│  Chat UI     │
 └──────────────┘
        │
        ▼ Display to Customer
@@ -616,7 +734,7 @@ Interest Detected
        ▼
 ┌──────────────┐
 │ Conversation │
-│   Service     │
+│   Service    │
 └──────────────┘
        │
        ├──► Start Information Collection
@@ -624,7 +742,7 @@ Interest Detected
        ▼
 ┌──────────────┐
 │ Lead Mgmt    │
-│   Service     │
+│   Service    │
 └──────────────┘
        │
        ├──► Collect Fields Sequentially
@@ -643,7 +761,7 @@ Interest Detected
        ▼
 ┌──────────────┐
 │ Lead         │
-│ Repository    │
+│ Repository   │
 └──────────────┘
        │
        ├──► Save to Database
@@ -651,7 +769,7 @@ Interest Detected
        └──► Link to Conversation
 ```
 
-### 8.3 Policy Information Retrieval Flow
+### 8.3 Policy Information Retrieval Flow (RAG-Based)
 
 ```
 Customer asks about policies
@@ -659,7 +777,7 @@ Customer asks about policies
        ▼
 ┌──────────────┐
 │ Conversation │
-│   Service     │
+│   Service    │
 └──────────────┘
        │
        ├──► Get Customer Profile
@@ -667,41 +785,318 @@ Customer asks about policies
        ▼
 ┌──────────────┐
 │ Policy       │
-│  Service      │
+│  Service     │
 └──────────────┘
        │
-       ├──► Match policies to customer profile
-       │    ├──► Age eligibility
-       │    ├──► Coverage needs
-       │    └──► Budget (if known)
+       ├──► Build semantic query from:
+       │    ├──► Customer message/question
+       │    ├──► Customer profile (age, needs, etc.)
+       │    └──► Conversation context
        │
        ▼
 ┌──────────────┐
-│ Policy       │
-│ Repository    │
+│  RAG         │
+│  Retriever   │
 └──────────────┘
        │
-       ▼ Query Database
+       ├──► Generate query embedding
+       │
+       ▼
 ┌──────────────┐
-│  PostgreSQL  │
+│  Embedding   │
+│  Generator   │
 └──────────────┘
        │
-       ▼ Policy data
+       ▼
+┌──────────────┐
+│  Vector      │
+│  Search      │
+└──────────────┘
+       │
+       ▼ Semantic similarity search
+┌──────────────┐
+│  Vector      │
+│  Database    │
+│  (Policy KB) │
+└──────────────┘
+       │
+       ▼ Top-k relevant policy documents
+┌──────────────┐
+│  RAG         │
+│  Retriever   │
+└──────────────┘
+       │
+       ▼ Retrieved context (policy documents + metadata)
 ┌──────────────┐
 │ Policy       │
-│  Service      │
+│  Service     │
 └──────────────┘
        │
-       ├──► Format for presentation
-       ├──► Add personalized examples
+       ├──► Format retrieved policies
+       ├──► Add customer-specific context
        │
        ▼
 ┌──────────────┐
 │ LLM Client   │
-│ (Generate    │
-│  response)    │
+│(RAG-Augmented│
+│ Generation)  │
+└──────────────┘
+       │
+       ├──► Prompt includes:
+       │    ├──► Customer query
+       │    ├──► Retrieved policy context
+       │    ├──► Customer profile
+       │    └──► Conversation history
+       │
+       ▼
+┌──────────────┐
+│  LLM Provider│
+│  (External)  │
+└──────────────┘
+       │
+       ▼ Accurate, context-aware response
+┌──────────────┐
+│ Conversation │
+│   Service    │
 └──────────────┘
 ```
+
+---
+
+## Knowledge Base Architecture (RAG)
+
+### 9.1 Knowledge Base Overview
+
+The Policy Knowledge Base is the core component that stores and retrieves company-specific life insurance policy information using RAG (Retrieval Augmented Generation). It enables the system to provide accurate, up-to-date policy information through semantic search.
+
+### 9.2 Knowledge Base Components
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              Knowledge Base Architecture                    │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌────────────────────────────────────────────────────┐     │
+│  │           Document Ingestion Pipeline              │     │
+│  │                                                    │     │
+│  │  Policy Documents → Chunking → Embedding → Vector  │     │
+│  │      (PDF/Text)      (Split)   (Generate)  (Store) │     │
+│  └────────────────────────────────────────────────────┘     │
+│                            │                                │
+│                            ▼                                │
+│  ┌────────────────────────────────────────────────────┐     │
+│  │              Vector Database                       │     │
+│  │  ┌──────────────┐  ┌──────────────┐                │     │
+│  │  │  Embeddings  │  │  Metadata    │                │     │
+│  │  │  (Vectors)   │  │  (Policy Info)│               │     │
+│  │  └──────────────┘  └──────────────┘                │     │
+│  └────────────────────────────────────────────────────┘     │
+│                            │                                │
+│                            ▼                                │
+│  ┌────────────────────────────────────────────────────┐     │
+│  │           Query Retrieval Pipeline                 │     │
+│  │                                                    │     │
+│  │  Query → Embedding → Vector Search → Top-K Results │     │
+│  │    (User)    (Generate)   (Similarity)   (Retrieve)│     │
+│  └────────────────────────────────────────────────────┘     │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 9.3 Document Ingestion Process
+
+#### 9.3.1 Document Sources
+
+**Policy Documents to Ingest**:
+- Policy brochures and fact sheets
+- Terms and conditions documents
+- Policy comparison charts
+- Premium calculation guides
+- Benefits and features documentation
+- Eligibility requirements
+- Claim process documents
+- FAQ documents
+
+**Document Formats Supported**:
+- PDF files
+- Markdown/text files
+- Structured JSON/CSV (policy metadata)
+- Web pages (scraped content)
+
+#### 9.3.2 Document Processing Pipeline
+
+1. **Document Loading**: Load policy documents from source (file system, API, database)
+2. **Text Extraction**: Extract text from PDFs, web pages, etc.
+3. **Chunking**: Split documents into smaller chunks (500-1000 tokens) with overlap
+4. **Metadata Extraction**: Extract metadata (policy name, type, coverage range, etc.)
+5. **Embedding Generation**: Generate vector embeddings for each chunk
+6. **Vector Storage**: Store embeddings and metadata in vector database
+
+**Chunking Strategy**:
+- **Size**: 500-1000 tokens per chunk
+- **Overlap**: 100-200 tokens between chunks (to preserve context)
+- **Boundaries**: Split at sentence or paragraph boundaries when possible
+- **Metadata**: Each chunk includes reference to source document and position
+
+### 9.4 Retrieval Process
+
+#### 9.4.1 Query Construction
+
+When a customer asks about policies, the system constructs a semantic query:
+
+```
+Base Query: Customer's original message/question
++ Customer Profile Context: Age, needs, family situation
++ Conversation Context: Previously discussed policies/interests
+= Enhanced Query for Retrieval
+```
+
+**Example**:
+- Customer: "What policies do you have for young families?"
+- Enhanced Query: "life insurance policies for young families with children, term life insurance, family protection coverage, affordable premiums"
+
+#### 9.4.2 Semantic Search Process
+
+1. **Query Embedding**: Convert enhanced query to vector embedding
+2. **Similarity Search**: Find top-k most similar policy document chunks (k=3-5)
+3. **Re-ranking** (Optional): Re-rank results using metadata filters (age eligibility, etc.)
+4. **Context Assembly**: Combine retrieved chunks with metadata into context
+
+#### 9.4.3 Retrieval Parameters
+
+- **Top-K**: Retrieve 3-5 most relevant policy chunks per query
+- **Similarity Threshold**: Minimum similarity score (e.g., 0.7) to include result
+- **Metadata Filtering**: Filter by policy type, age eligibility, active status
+- **Diversity**: Ensure retrieved chunks represent different policies when relevant
+
+### 9.5 RAG Integration with LLM
+
+#### 9.5.1 Context Injection
+
+Retrieved policy context is injected into the LLM prompt:
+
+```
+System Prompt:
+You are an AI life insurance sales agent for [Company Name].
+You have access to the following policy information:
+
+[Retrieved Policy Context - 1]
+Policy: Term Life 20 Year
+Coverage: $50,000 - $1,000,000
+Premium Range: $50-$200/month
+Benefits: ...
+...
+
+[Retrieved Policy Context - 2]
+...
+
+Customer Profile: {customer_profile}
+Conversation History: {recent_messages}
+
+Answer the customer's question using ONLY the information from the retrieved policies above.
+If the information is not in the retrieved context, say you don't have that information.
+```
+
+#### 9.5.2 Response Generation
+
+- LLM generates response based on retrieved policy context
+- Response is grounded in actual policy documents (reduces hallucinations)
+- LLM can cite specific policies and reference retrieved information
+- Response includes relevant policy details from knowledge base
+
+### 9.6 Knowledge Base Management
+
+#### 9.6.1 Adding New Policies
+
+**Process**:
+1. Admin uploads policy document (PDF, text, etc.)
+2. Document goes through ingestion pipeline
+3. New embeddings generated and stored
+4. Metadata updated in database
+5. Knowledge base version incremented
+
+#### 9.6.2 Updating Existing Policies
+
+**Process**:
+1. Identify policy document(s) to update
+2. Mark old chunks as deprecated (don't delete immediately)
+3. Ingest updated document as new version
+4. Update metadata with version timestamp
+5. Gradually deprecate old versions after verification
+
+#### 9.6.3 Version Control
+
+- Maintain version history of policy documents
+- Track when policies were added/updated
+- Enable rollback if needed
+- Audit trail for policy changes
+
+### 9.7 Knowledge Base Quality Assurance
+
+#### 9.7.1 Quality Checks
+
+- **Coverage**: Ensure all active policies are in knowledge base
+- **Accuracy**: Verify retrieved information matches source documents
+- **Completeness**: Check that policy details are not fragmented across chunks
+- **Freshness**: Regular updates when policies change
+
+#### 9.7.2 Testing
+
+- **Retrieval Testing**: Test queries to ensure relevant policies are retrieved
+- **Accuracy Testing**: Verify LLM responses match policy documents
+- **Coverage Testing**: Ensure all policy types are retrievable
+- **Performance Testing**: Measure retrieval latency (target: <200ms)
+
+### 9.8 Implementation Options
+
+#### Option 1: Chroma (Development/Simple Production)
+
+**Setup**:
+```python
+import chromadb
+
+client = chromadb.Client()
+collection = client.create_collection("policy_knowledge_base")
+
+# Store embeddings
+collection.add(
+    embeddings=policy_embeddings,
+    documents=policy_chunks,
+    metadatas=policy_metadata,
+    ids=policy_ids
+)
+
+# Query
+results = collection.query(
+    query_embeddings=[query_embedding],
+    n_results=5
+)
+```
+
+**Pros**: Simple, Python-native, good for development
+**Cons**: Limited scalability
+
+#### Option 2: Pinecone (Production/Managed)
+
+**Setup**:
+- Managed service, no infrastructure to maintain
+- Highly scalable, fast retrieval
+- Pay-per-use pricing
+
+**Pros**: Production-ready, scalable, managed
+**Cons**: External dependency, cost
+
+#### Option 3: Qdrant (Self-Hosted Production)
+
+**Setup**:
+- Self-hosted vector database
+- Docker deployment
+- Good performance and scalability
+
+**Pros**: Self-hosted, open source, scalable
+**Cons**: Requires infrastructure management
+
+**Recommendation**: Start with Chroma for development, migrate to Pinecone or Qdrant for production based on scale requirements.
 
 ---
 
@@ -1005,6 +1400,13 @@ class APIClient:
 - Version: 13+ (or SQLite for development)
 - Storage: Based on expected lead volume
 - Backup: Daily automated backups
+
+**Vector Database (Knowledge Base)**:
+- **Chroma** (Development): Local file-based, minimal setup required
+- **Pinecone** (Production): Managed service, no infrastructure needed
+- **Qdrant** (Self-hosted): Docker container, 2-4 GB RAM recommended
+- **Storage**: Depends on policy document volume (typically 100MB-1GB for small to medium policy sets)
+- **Embedding Model**: OpenAI API or local model (sentence-transformers)
 
 **Redis**:
 - Version: 6+

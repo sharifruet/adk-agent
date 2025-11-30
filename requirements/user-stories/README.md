@@ -13,8 +13,8 @@ Stories related to detecting interest, qualifying leads, and collecting customer
 ### 🟡 Data Management & Storage (US-013 to US-015)
 Stories related to storing, validating, and managing customer data and conversations.
 
-### 🔴 Admin & Management (US-016 to US-019, US-028 to US-029)
-Stories related to administrative features for viewing leads, conversations, managing policies, and lead assignment.
+### 🔴 Admin & Management (US-016 to US-019, US-028 to US-030)
+Stories related to administrative features for viewing leads, conversations, managing policies, knowledge base management, and lead assignment.
 
 ### 🟣 System Features (US-020 to US-022)
 Stories related to error handling, exit handling, and ambiguity resolution.
@@ -69,6 +69,7 @@ Stories related to conversation analytics and reporting.
 | US-019 | Manage Policy Information | ✅ Done | [us-019-manage-policies.md](./us-019-manage-policies.md) |
 | US-028 | Update Lead Status | ⚠️ Partial | [us-028-update-lead-status.md](./us-028-update-lead-status.md) |
 | US-029 | Assign Leads to Sales Agents | 📝 Future | [us-029-assign-leads.md](./us-029-assign-leads.md) |
+| US-030 | Manage Policy Knowledge Base | 📝 Draft | [us-030-manage-knowledge-base.md](./us-030-manage-knowledge-base.md) |
 
 ### System Features
 
@@ -120,10 +121,11 @@ Stories related to conversation analytics and reporting.
 - **Features**: Voice transcription, TTS, real-time voice conversations, analytics
 
 ### Total Implementation
-- **Completed**: 24 out of 29 stories (83% fully done)
+- **Completed**: 24 out of 30 stories (80% fully done)
 - **Mostly Done**: 2 stories (US-005, US-006) - Core complete, enhancements available
 - **Partial**: 2 stories (US-012, US-028) - Need implementation
 - **Future**: 1 story (US-029) - Planned for future
+- **Draft**: 1 story (US-030) - Knowledge base management, needs implementation
 - **In Progress**: 0
 
 ---
@@ -225,9 +227,9 @@ High / Medium / Low
 ## Updates
 
 - **Last Updated**: 2024-01-15
-- **Total Stories**: 29
-- **Completed**: 24 (83%)
-- **Status**: Phase 1 & Phase 2 Complete, Additional Admin Features Added
+- **Total Stories**: 30 (including US-030: Knowledge Base Management)
+- **Completed**: 24 (80%)
+- **Status**: Phase 1 & Phase 2 Complete, RAG Knowledge Base Architecture Added
 
 ---
 

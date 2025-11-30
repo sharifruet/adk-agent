@@ -37,12 +37,14 @@ So that **I can make an informed decision by understanding all available options
 - And the system offers to help with what is known
 - And the system may suggest speaking with sales team for detailed competitor analysis
 
-### AC-005.5: Competitor Policy Database
+### AC-005.5: Competitor Policy Information (Optional/Limited)
 - Given the system needs competitor information
 - When accessing data
-- Then the system maintains a database of competitor policy information
-- And information includes: policy names, coverage ranges, typical premiums, key features
-- And information is updated regularly
+- Then the system **may** have limited competitor policy information in the knowledge base
+- And competitor information is **optional** and not the primary focus
+- And if competitor information exists in knowledge base, it includes: policy names, coverage ranges, typical premiums, key features
+- And the system redirects focus to company's own policies when appropriate
+- And if detailed competitor information is not available, system acknowledges limitation
 
 ## Detailed Scenarios
 
@@ -94,12 +96,13 @@ So that **I can make an informed decision by understanding all available options
 - Competitor information can be added to policy database
 
 ## Related Requirements
-- **FR-2.2.1**: Accurate competitor information
-- **FR-2.2.2**: Fairness and accuracy
-- **FR-2.2.3**: Strategic use of competitor info
-- **FR-2.2.4**: On-demand provision
-- **FR-2.2.5**: Limited information acknowledgment
-- **FR-9.2**: Maintain competitor policy database
+- **FR-2.2.1**: Optional/limited competitor information (may be available in knowledge base)
+- **FR-2.2.2**: Fairness and accuracy (if competitor info exists)
+- **FR-2.2.3**: Redirect focus to company policies
+- **FR-2.2.4**: Prioritize company's own policies
+- **FR-2.2.5**: Acknowledge when competitor information is not available
+- **FR-2.2.6**: Competitor policy information is optional in knowledge base
+- **FR-9.7**: Focus on company-specific policies (competitor info optional)
 
 ## Dependencies
 - **Depends on**: US-004 (policy presentation)
