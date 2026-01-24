@@ -1,84 +1,95 @@
-# LIC Agent
+# Life Insurance Sales Agent
 
-A Spring Boot application using Google's ADK (Agent Development Kit) with Gemini AI.
+A full-stack application featuring an AI-powered life insurance sales agent that helps prospective customers understand their insurance needs and collects lead information for human sales agents to follow up.
 
-## Prerequisites
+## Project Structure
 
-- Java 25+
-- Maven 3.6+
-
-## Configuration
-
-The application requires a Gemini API key. You can configure it in two ways:
-
-### Option 1: Set Environment Variable (Recommended)
-
-Set the environment variable before starting the application:
-
-```bash
-export GEMINI_API_KEY=your-api-key-here
-# or
-export GOOGLE_API_KEY=your-api-key-here
+```
+lic-agent/
+├── backend/          # Spring Boot REST API
+│   ├── src/         # Java source code
+│   ├── pom.xml      # Maven configuration
+│   ├── mvnw         # Maven wrapper
+│   └── run.sh       # Run script
+├── frontend/        # React.js frontend (to be created)
+├── docs/            # Documentation
+│   ├── requirements.md
+│   ├── README.md    # Detailed documentation
+│   └── HELP.md
+└── README.md        # This file
 ```
 
-Then run:
-```bash
-mvn spring-boot:run
-```
+## Quick Start
 
-### Option 2: Use application.yaml
+### Backend
 
-Add your API key to `src/main/resources/application.yaml`:
+1. Navigate to backend directory:
+   ```bash
+   cd backend
+   ```
 
-```yaml
-com:
-  i2gether:
-    lic:
-      agent:
-        api-key: your-api-key-here
-```
+2. Set your Gemini API key in `src/main/resources/application.yaml`:
+   ```yaml
+   com:
+     i2gether:
+       lic:
+         agent:
+           api-key: YOUR_API_KEY_HERE
+   ```
 
-Then use the provided script to automatically set the environment variable:
+3. Run the application:
+   ```bash
+   ./run.sh
+   ```
+   
+   Or manually:
+   ```bash
+   export GEMINI_API_KEY=your-api-key
+   ./mvnw spring-boot:run
+   ```
 
-```bash
-./run.sh
-```
+The backend will start on `http://localhost:8080`
 
-The script reads the API key from `application.yaml` and sets it as an environment variable before starting the application.
+### Frontend
 
-## Running the Application
-
-### Using the run script (reads from application.yaml):
-```bash
-./run.sh
-```
-
-### Using Maven directly (requires environment variable):
-```bash
-export GEMINI_API_KEY=your-api-key-here
-mvn spring-boot:run
-```
-
-### Using Maven with inline environment variable:
-```bash
-GEMINI_API_KEY=your-api-key-here mvn spring-boot:run
-```
+Frontend setup instructions will be added when the React application is created.
 
 ## API Endpoints
 
-Once running, the application exposes:
+- `POST /api/v1/agent/interact` - Main interaction endpoint
+- `POST /api/v1/agent/leads` - Submit customer information
+- `GET /api/v1/agent/session/{sessionId}` - Get conversation history
+- `GET /api/v1/agent/admin/leads` - Get all leads (for human agents)
 
-- `POST /api/v1/agent/interact` - Interact with the AI agent
+See `backend/apis.rest` for API testing examples.
 
-See `apis.rest` for example requests using the VS Code REST Client extension.
+## Documentation
 
-## Troubleshooting
+- [Requirements Document](docs/requirements.md) - Complete project requirements
+- [Backend README](docs/README.md) - Detailed backend documentation
 
-If you see the error: "API key must either be provided or set in the environment variable GOOGLE_API_KEY or GEMINI_API_KEY"
+## Technology Stack
 
-1. Ensure the environment variable is set before the JVM starts
-2. Use the `run.sh` script which handles this automatically
-3. Or set it manually: `export GEMINI_API_KEY=your-key` before running
+### Backend
+- Java 25
+- Spring Boot 4.0.1
+- Google ADK (Agent Development Kit)
+- Gemini AI
 
-Note: The library checks environment variables at runtime, so they must be set before starting the application. Setting them programmatically inside the application may not work due to JVM security restrictions.
+### Frontend (Planned)
+- React 18+
+- Tailwind CSS
+- Axios
+
+## Development
+
+### Backend Development
+All backend code is in the `backend/` directory. Use standard Maven commands from that directory.
+
+### Frontend Development
+Frontend code will be in the `frontend/` directory. Setup instructions will be provided.
+
+## License
+
+[Add your license here]
 

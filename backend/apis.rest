@@ -1,0 +1,107 @@
+### Life Insurance Sales Agent API Tests
+
+@baseUrl = http://localhost:8080
+@contentType = application/json
+
+### Health Check (if available)
+GET {{baseUrl}}/actuator/health
+Accept: {{contentType}}
+
+###
+
+### Get All Insurance Products
+GET {{baseUrl}}/api/v1/agent/products
+Accept: {{contentType}}
+
+###
+
+### Get Product by Type
+GET {{baseUrl}}/api/v1/agent/products/TERM
+Accept: {{contentType}}
+
+###
+
+### Search Products
+GET {{baseUrl}}/api/v1/agent/products/search?keyword=term
+Accept: {{contentType}}
+
+###
+
+### Interact with Agent - Initial Greeting
+POST {{baseUrl}}/api/v1/agent/interact
+Content-Type: {{contentType}}
+
+{
+  "question": "Hello, I'm interested in life insurance"
+}
+
+###
+
+### Interact with Agent - Needs Assessment
+POST {{baseUrl}}/api/v1/agent/interact
+Content-Type: {{contentType}}
+
+{
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "sessionId": "660e8400-e29b-41d4-a716-446655440001",
+  "question": "I'm 35 years old, have two children, and want to make sure they're protected if something happens to me"
+}
+
+###
+
+### Interact with Agent - Product Question
+POST {{baseUrl}}/api/v1/agent/interact
+Content-Type: {{contentType}}
+
+{
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "sessionId": "660e8400-e29b-41d4-a716-446655440001",
+  "question": "What's the difference between term and whole life insurance?"
+}
+
+###
+
+### Interact with Agent - Show Interest
+POST {{baseUrl}}/api/v1/agent/interact
+Content-Type: {{contentType}}
+
+{
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "sessionId": "660e8400-e29b-41d4-a716-446655440001",
+  "question": "That sounds good, I'd like to learn more. How do I get started?"
+}
+
+###
+
+### Submit Lead Information
+POST {{baseUrl}}/api/v1/agent/leads
+Content-Type: {{contentType}}
+
+{
+  "sessionId": "660e8400-e29b-41d4-a716-446655440001",
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "John Doe",
+  "phone": "+1-555-123-4567",
+  "email": "john.doe@example.com"
+}
+
+###
+
+### Get Conversation History
+GET {{baseUrl}}/api/v1/agent/session/660e8400-e29b-41d4-a716-446655440001
+Accept: {{contentType}}
+
+###
+
+### Get All Leads (Admin)
+GET {{baseUrl}}/api/v1/agent/admin/leads
+Accept: {{contentType}}
+
+###
+
+### Get Specific Lead (Admin)
+GET {{baseUrl}}/api/v1/agent/admin/leads/{leadId}
+Accept: {{contentType}}
+
+###
+
