@@ -14,9 +14,12 @@ public class CorsConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
         
-        // Allow all origins in development (restrict in production)
+        // Allow frontend origins
         config.setAllowCredentials(true);
-        config.addAllowedOriginPattern("*"); // Use allowedOriginPatterns for wildcard
+        config.addAllowedOrigin("https://lic-agent.i2gether.com");
+        config.addAllowedOrigin("http://lic-agent.i2gether.com");
+        config.addAllowedOrigin("https://agent.i2gether.com");
+        config.addAllowedOrigin("http://agent.i2gether.com"); // Allow both http and https
         config.addAllowedHeader("*");
         config.addAllowedMethod("GET");
         config.addAllowedMethod("POST");

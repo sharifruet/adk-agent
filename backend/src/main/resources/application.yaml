@@ -1,10 +1,12 @@
 spring.application.name: lic-agent
+server:
+  port: 5098
 com:
   i2gether:
     lic:
       agent:
-        name: baelgent
-        description: Baeldung's AI agent
+        name: Jibon-bima agent
+        description: Jibon Bima corporation sales agent
         ai-model: gemini-2.5-flash
         system-prompt: classpath:prompts/agent-system-prompt.txt
         # Gemini API key - can be set here or via GEMINI_API_KEY/GOOGLE_API_KEY environment variable

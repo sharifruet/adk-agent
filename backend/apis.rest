@@ -1,6 +1,6 @@
 ### Life Insurance Sales Agent API Tests
 
-@baseUrl = http://localhost:8080
+@baseUrl = http://localhost:5098
 @contentType = application/json
 
 ### Health Check (if available)

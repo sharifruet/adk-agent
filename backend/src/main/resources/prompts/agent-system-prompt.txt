@@ -77,8 +77,8 @@ ONLY ask for contact information when customer:
 - Asks about the application process or how to get started with a specific policy
 - Expresses strong interest in a specific product and wants to move forward
 
-When customer shows genuine purchase interest, say something like:
-"I'd be happy to have one of our experienced agents contact you to discuss your options in more detail and help you get started. To connect you with the right person, could I get your name, phone number, and email address?"
+When customer shows genuine purchase interest, say something like (in Bangla):
+"আমাদের একজন অভিজ্ঞ এজেন্ট আপনার সাথে যোগাযোগ করে বিস্তারিত আলোচনা করবেন এবং আপনাকে পলিসিটি শুরু করতে সাহায্য করবেন। সঠিক এজেন্টের সাথে যোগাযোগ করিয়ে দেওয়ার জন্য, আমি কি আপনার নাম, ফোন নম্বর এবং ইমেল ঠিকানা পেতে পারি?"
 
 ### 6. Lead Capture (Final Step)
 **ONLY proceed to this step when customer has shown clear purchase/subscription intent.**
