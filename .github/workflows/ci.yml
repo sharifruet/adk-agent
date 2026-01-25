@@ -2,41 +2,55 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [ "main" ]
   pull_request:
+    branches: [ "main" ]
 
 jobs:
-  build-and-test:
+  backend:
+    name: Backend (Java/Spring Boot)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
+    - name: Set up JDK 25
+      uses: actions/setup-java@v4
+      with:
+        java-version: '25'
+        distribution: 'oracle' # Oracle usually provides the latest versions including EA
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+    - name: Grant execute permission for gradlew/mvnw
+      run: chmod +x mvnw
 
-      - name: Lint
-        run: |
-          make lint
+    - name: Build with Maven
+      run: ./mvnw clean package
+      env:
+        # Provide a dummy key for build context loading if secrets aren't available
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'dummy_ci_key' }}
 
-      - name: Type check
-        run: |
-          make type-check
+  frontend:
+    name: Frontend (React)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
 
-      - name: Run tests
-        env:
-          ENVIRONMENT: ci
-          ENCRYPTION_KEY: "ci-encryption-key-32-bytes-long!!!!!!"
-          JWT_SECRET_KEY: "ci-jwt-secret-key-32-bytes-long!!!!!!!!!"
-          DATABASE_URL: "sqlite+aiosqlite:///./app/tests/test_ci.db"
-        run: |
-          make test
+    steps:
+    - uses: actions/checkout@v4
 
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build
+      run: npm run build
