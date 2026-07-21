@@ -82,68 +82,19 @@ public class ProductService {
     }
 
     /**
-     * Get product knowledge base content by product type
+     * Get product knowledge base content by product type.
+     * All product information is now in the Jibon Bima booklet.
      */
     public String getProductKnowledgeBase(ProductType productType) {
-        String fileName = switch (productType) {
-            case TERM -> "term-life-insurance.md";
-            case WHOLE -> "whole-life-insurance.md";
-            case UNIVERSAL -> "universal-life-insurance.md";
-            case VARIABLE -> "variable-life-insurance.md";
-            case GROUP -> "group-life-insurance.md";
-            case TERM_BENEFIT_PENSION -> "term-benefit-pension-insurance.md";
-            case THREE_INSTALLMENT -> "three-installment-insurance.md";
-            case MULTIPLE_INSTALLMENT -> "multiple-installment-insurance.md";
-            case JBC_MONTHLY_SAVINGS -> "jbc-monthly-savings-scheme.md";
-            case JBC_EXPECTED_MONTHLY_SAVINGS -> "jbc-expected-monthly-savings.md";
-            case SOCIAL_SECURITY -> "social-security-insurance.md";
-            case PROMILA_DPS -> "promila-dps-scheme.md";
-            case RURAL_LIFE -> "rural-life-insurance.md";
-            case PERSONAL_PENSION -> "personal-pension-insurance.md";
-            case CHILD_SECURITY -> "child-security-insurance.md";
-        };
-        
-        return getProductKnowledgeBase(fileName);
+        return getProductKnowledgeBase("jibon-bima-booklet.md");
     }
 
     /**
      * Get all product knowledge base content (for agent context)
-     * Loads all markdown files from the knowledgebase directory
+     * Loads the Jibon Bima Corporation product booklet
      */
     public String getAllProductKnowledgeBase() {
-        StringBuilder knowledgeBase = new StringBuilder();
-        knowledgeBase.append("# জীবন বীমা কর্পোরেশন - Insurance Products Knowledge Base\n\n");
-        knowledgeBase.append("This knowledge base contains information about all available insurance products from Jiban Bima Corporation (জীবন বীমা কর্পোরেশন).\n\n");
-        
-        // List of all knowledge base files (in order of importance)
-        String[] knowledgeBaseFiles = {
-            "term-benefit-pension-insurance.md",
-            "three-installment-insurance.md",
-            "multiple-installment-insurance.md",
-            "jbc-monthly-savings-scheme.md",
-            "jbc-expected-monthly-savings.md",
-            "social-security-insurance.md",
-            "promila-dps-scheme.md",
-            "rural-life-insurance.md",
-            "personal-pension-insurance.md",
-            "child-security-insurance.md",
-            // Keep old products for backward compatibility
-            "term-life-insurance.md",
-            "whole-life-insurance.md",
-            "universal-life-insurance.md",
-            "variable-life-insurance.md",
-            "group-life-insurance.md"
-        };
-        
-        for (String fileName : knowledgeBaseFiles) {
-            String content = getProductKnowledgeBase(fileName);
-            if (content != null && !content.equals("Product information not available.")) {
-                knowledgeBase.append(content);
-                knowledgeBase.append("\n\n---\n\n");
-            }
-        }
-        
-        return knowledgeBase.toString();
+        return getProductKnowledgeBase("jibon-bima-booklet.md");
     }
 
     // Product definitions

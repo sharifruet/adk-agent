@@ -21,6 +21,24 @@
 
 .message.agent {
   justify-content: flex-start;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.message-logo {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  object-fit: contain;
+  opacity: 0.5;
+}
+
+.message-logo-left {
+  margin-top: 0.5rem;
+}
+
+.message-logo-right {
+  margin-top: 0.5rem;
 }
 
 .message-content {
@@ -31,7 +49,7 @@
 }
 
 .message.user .message-content {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
   color: white;
   border-bottom-right-radius: 4px;
 }
@@ -46,8 +64,31 @@
 
 .message-text {
   margin-bottom: 0.25rem;
-  line-height: 1.5;
+  line-height: 1.6;
   white-space: pre-wrap;
+}
+
+/* Markdown rendering for agent messages */
+.message-text .message-paragraph {
+  margin: 0 0 0.5rem 0;
+}
+.message-text .message-paragraph:last-child {
+  margin-bottom: 0;
+}
+.message-text .message-list {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+  list-style-type: disc;
+}
+.message-text .message-list-ordered {
+  list-style-type: decimal;
+}
+.message-text .message-list-item {
+  margin-bottom: 0.35rem;
+}
+.message-text .message-bold {
+  font-weight: 600;
+  color: inherit;
 }
 
 .message-timestamp {

@@ -14,18 +14,13 @@ public class CorsConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
         
-        // Allow frontend origins
-        config.setAllowCredentials(true);
-        config.addAllowedOrigin("https://lic-agent.i2gether.com");
-        config.addAllowedOrigin("http://lic-agent.i2gether.com");
-        config.addAllowedOrigin("https://agent.i2gether.com");
-        config.addAllowedOrigin("http://agent.i2gether.com"); // Allow both http and https
+        // Allow specific origins: localhost and i2gether.com domains
+        config.setAllowCredentials(false);
+        config.addAllowedOriginPattern("http://localhost:*");
+        config.addAllowedOriginPattern("https://*.i2gether.com");
+        config.addAllowedOriginPattern("http://*.i2gether.com");
         config.addAllowedHeader("*");
-        config.addAllowedMethod("GET");
-        config.addAllowedMethod("POST");
-        config.addAllowedMethod("PUT");
-        config.addAllowedMethod("DELETE");
-        config.addAllowedMethod("OPTIONS");
+        config.addAllowedMethod("*");
         
         // Expose headers that frontend might need
         config.addExposedHeader("Content-Type");
