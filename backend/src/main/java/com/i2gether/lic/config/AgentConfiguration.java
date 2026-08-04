@@ -2,10 +2,8 @@ package com.i2gether.lic.config;
 
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.LlmAgent;
-import com.google.adk.tools.FunctionTool;
 import com.i2gether.lic.models.AgentProperties;
 import com.i2gether.lic.services.ProductService;
-import com.i2gether.lic.tool.AuthorFetcher;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -35,9 +33,6 @@ public class AgentConfiguration {
                 .description(agentProperties.description())
                 .model(agentProperties.aiModel())
                 .instruction(enhancedPrompt)
-                .tools(
-                    FunctionTool.create(AuthorFetcher.class, "fetch")
-                )
                 .build();
         } catch (Exception e) {
             // If product knowledge base fails to load, use base prompt only
@@ -48,9 +43,6 @@ public class AgentConfiguration {
                 .description(agentProperties.description())
                 .model(agentProperties.aiModel())
                 .instruction(systemPrompt)
-                .tools(
-                    FunctionTool.create(AuthorFetcher.class, "fetch")
-                )
                 .build();
         }
     }

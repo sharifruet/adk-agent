@@ -45,12 +45,12 @@ public class AgentService {
         Content userMessage = Content.fromParts(Part.fromText(request.question()));
         StringBuilder answerBuilder = new StringBuilder();
         runner.runAsync(userId.toString(), session.id(), userMessage)
-            .blockingForEach(event -> {
-                String content = event.stringifyContent();
-                if (content != null && !content.isBlank()) {
-                    answerBuilder.append(content);
+            .blockingForEach(event -> event.content().ifPresent(content -> {
+                String text = content.text();
+                if (text != null && !text.isBlank()) {
+                    answerBuilder.append(text);
                 }
-            });
+            }));
 
         String answer = answerBuilder.toString();
         
