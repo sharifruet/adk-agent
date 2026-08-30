@@ -15,7 +15,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: #999;
+  background-color: var(--jbc-blue-light);
   animation: typing 1.4s infinite;
 }
 

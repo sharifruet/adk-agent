@@ -17,7 +17,7 @@
 }
 
 .message-input-field:focus {
-  border-color: #0d9488;
+  border-color: var(--jbc-blue);
 }
 
 .message-input-field:disabled {
@@ -27,7 +27,7 @@
 
 .message-send-button {
   padding: 0.75rem 2rem;
-  background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+  background: var(--jbc-gradient);
   color: white;
   border: none;
   border-radius: 24px;
