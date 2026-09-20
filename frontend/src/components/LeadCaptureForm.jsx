@@ -1,16 +1,42 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useConversation } from '../context/ConversationContext';
+import { useLocale } from '../context/LocaleContext';
 import './LeadCaptureForm.css';
 
+const SUCCESS_VISIBLE_MS = 4000;
+const EMPTY = { name: '', phone: '', email: '' };
+
+const CheckIcon = () => (
+  <svg
+    viewBox="0 0 20 20"
+    width="20"
+    height="20"
+    aria-hidden="true"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="m4.5 10.5 3.5 3.5 7.5-8" />
+  </svg>
+);
+
 const LeadCaptureForm = () => {
-  const { submitCustomerInfo, setRequiresLeadCapture, isLoading } = useConversation();
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    email: '',
-  });
+  const { submitCustomerInfo, setRequiresLeadCapture } = useConversation();
+  const { t } = useLocale();
+  const [formData, setFormData] = useState(EMPTY);
+  const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState(null);
+
+  // Once the details are in, show the confirmation briefly, then hand the
+  // conversation back to the customer.
+  useEffect(() => {
+    if (!submitted) return undefined;
+    const timer = setTimeout(() => setRequiresLeadCapture(false), SUCCESS_VISIBLE_MS);
+    return () => clearTimeout(timer);
+  }, [submitted, setRequiresLeadCapture]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -21,108 +47,114 @@ const LeadCaptureForm = () => {
     e.preventDefault();
     setError(null);
 
-    // Basic validation
     if (!formData.name.trim() || !formData.phone.trim() || !formData.email.trim()) {
-      setError('Please fill in all fields');
+      setError(t.lead.required);
       return;
     }
 
+    setSubmitting(true);
     try {
-      await submitCustomerInfo(formData);
+      await submitCustomerInfo({
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+        email: formData.email.trim(),
+      });
       setSubmitted(true);
-      setTimeout(() => {
-        setRequiresLeadCapture(false);
-      }, 3000);
-    } catch (err) {
-      setError(err.message || 'Failed to submit. Please try again.');
+    } catch {
+      setError(t.lead.failed);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleCancel = () => {
     setRequiresLeadCapture(false);
-    setFormData({ name: '', phone: '', email: '' });
-    setError(null);
   };
 
   if (submitted) {
     return (
-      <div className="lead-capture-form success">
-        <div className="success-message">
-          <p>✓ Thank you! Your information has been submitted.</p>
-          <p>A human agent will contact you soon.</p>
+      <div className="lead lead-success" role="status">
+        <span className="lead-success-icon">
+          <CheckIcon />
+        </span>
+        <div>
+          <p className="lead-title">{t.lead.successTitle}</p>
+          <p className="lead-body">{t.lead.successBody}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="lead-capture-form">
-      <div className="form-header">
-        <h3>Contact Information</h3>
-        <p>Please provide your details so we can connect you with an agent</p>
-      </div>
-      
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label htmlFor="name">Full Name *</label>
+    <form className="lead" onSubmit={handleSubmit} noValidate>
+      <p className="lead-title">{t.lead.title}</p>
+      <p className="lead-body">{t.lead.body}</p>
+
+      <div className="lead-fields">
+        <div className="lead-field">
+          <label htmlFor="lead-name">{t.lead.name}</label>
           <input
-            type="text"
-            id="name"
+            id="lead-name"
             name="name"
+            type="text"
+            autoComplete="name"
             value={formData.name}
             onChange={handleChange}
+            placeholder={t.lead.namePlaceholder}
+            disabled={submitting}
             required
-            disabled={isLoading}
-            placeholder="Enter your full name"
           />
         </div>
 
-        <div className="form-group">
-          <label htmlFor="phone">Phone Number *</label>
+        <div className="lead-field">
+          <label htmlFor="lead-phone">{t.lead.phone}</label>
           <input
-            type="tel"
-            id="phone"
+            id="lead-phone"
             name="phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             value={formData.phone}
             onChange={handleChange}
+            placeholder={t.lead.phonePlaceholder}
+            disabled={submitting}
             required
-            disabled={isLoading}
-            placeholder="Enter your phone number"
           />
         </div>
 
-        <div className="form-group">
-          <label htmlFor="email">Email Address *</label>
+        <div className="lead-field">
+          <label htmlFor="lead-email">{t.lead.email}</label>
           <input
-            type="email"
-            id="email"
+            id="lead-email"
             name="email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
             value={formData.email}
             onChange={handleChange}
+            placeholder={t.lead.emailPlaceholder}
+            disabled={submitting}
             required
-            disabled={isLoading}
-            placeholder="Enter your email address"
           />
         </div>
+      </div>
 
-        {error && (
-          <div className="form-error">
-            <p>{error}</p>
-          </div>
-        )}
+      {error && (
+        <p className="lead-error" role="alert">
+          {error}
+        </p>
+      )}
 
-        <div className="form-actions">
-          <button type="submit" disabled={isLoading} className="submit-button">
-            {isLoading ? 'Submitting...' : 'Submit'}
-          </button>
-          <button type="button" onClick={handleCancel} className="cancel-button" disabled={isLoading}>
-            Cancel
-          </button>
-        </div>
-      </form>
-    </div>
+      <div className="lead-actions">
+        <button type="submit" className="lead-submit" disabled={submitting}>
+          {submitting ? t.lead.submitting : t.lead.submit}
+        </button>
+        <button type="button" className="lead-cancel" onClick={handleCancel} disabled={submitting}>
+          {t.lead.cancel}
+        </button>
+      </div>
+    </form>
   );
 };
 
 export default LeadCaptureForm;
-

@@ -1,0 +1,90 @@
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: auto 0; /* centres vertically in the conversation column */
+  padding: 24px 0 8px;
+  text-align: center;
+}
+
+.empty-mark {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 20px;
+  object-fit: contain;
+}
+
+.empty-title {
+  max-width: 24ch;
+  margin: 0 0 10px;
+  font-size: 27px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+
+/* Tightening Latin display type is fine; tightening Bangla breaks the
+   matra that joins letters, so only English gets the negative tracking. */
+:lang(en) .empty-title {
+  letter-spacing: -0.015em;
+}
+
+.empty-body {
+  max-width: 46ch;
+  margin: 0;
+  font-size: 16px;
+  color: var(--ink-muted);
+  text-wrap: pretty;
+}
+
+.empty-suggestions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  max-width: 580px;
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.empty-suggestions button {
+  width: 100%;
+  min-height: 52px;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 14.5px;
+  line-height: 1.5;
+  text-align: start;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.empty-suggestions button:hover:not(:disabled) {
+  background: var(--mist);
+  border-color: var(--line-strong);
+}
+
+.empty-suggestions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (max-width: 560px) {
+  .empty-title {
+    font-size: 22px;
+  }
+
+  .empty-body {
+    font-size: 15px;
+  }
+
+  .empty-suggestions {
+    grid-template-columns: 1fr;
+    margin-top: 22px;
+  }
+}

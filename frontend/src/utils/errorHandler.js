@@ -7,7 +7,7 @@ export const handleApiError = (error) => {
     // Server responded with error status
     const status = error.response.status;
     const message = error.response.data?.message || error.response.data?.error || 'An error occurred';
-    
+
     switch (status) {
       case 400:
         return `Bad Request: ${message}`;
@@ -43,3 +43,16 @@ export const isClientError = (error) => {
   return error.response && error.response.status >= 400 && error.response.status < 500;
 };
 
+/**
+ * Coarse category the UI can translate: 'network' | 'server' | 'client' | 'unknown'.
+ * Accepts either a raw axios error or one of the enhanced errors thrown by
+ * agentService (which carry the axios error as `originalError`).
+ */
+export const classifyError = (error) => {
+  const source = error?.originalError || error;
+  if (!source) return 'unknown';
+  if (isNetworkError(source)) return 'network';
+  if (isServerError(source)) return 'server';
+  if (isClientError(source)) return 'client';
+  return 'unknown';
+};

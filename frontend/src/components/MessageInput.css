@@ -1,63 +1,103 @@
-.message-input {
+.composer {
+  flex: none;
+  background: var(--canvas);
+}
+
+.composer-inner {
+  max-width: var(--column);
+  margin: 0 auto;
+  padding: 8px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+}
+
+.composer-field {
   display: flex;
-  gap: 0.5rem;
-  padding: 1rem;
-  background-color: #ffffff;
-  border-top: 1px solid #e0e0e0;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 6px 6px 6px 18px;
+  border: 1px solid transparent;
+  border-radius: 26px;
+  background: var(--mist);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
-.message-input-field {
+.composer-field:focus-within {
+  background: var(--canvas);
+  border-color: var(--jbc-navy);
+  box-shadow: var(--focus-ring);
+}
+
+.composer-field.is-locked {
+  opacity: 0.55;
+}
+
+.composer-field textarea {
   flex: 1;
-  padding: 0.75rem 1rem;
-  border: 2px solid #e0e0e0;
-  border-radius: 24px;
-  font-size: 1rem;
+  min-width: 0;
+  min-height: 40px;
+  max-height: 168px;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 16px; /* 16px keeps iOS from zooming the page on focus */
+  line-height: 24px;
+  resize: none;
   outline: none;
-  transition: border-color 0.2s;
 }
 
-.message-input-field:focus {
-  border-color: var(--jbc-blue);
+.composer-field textarea::placeholder {
+  color: var(--ink-muted);
 }
 
-.message-input-field:disabled {
-  background-color: #f5f5f5;
+.composer-field textarea:disabled {
   cursor: not-allowed;
 }
 
-.message-send-button {
-  padding: 0.75rem 2rem;
-  background: var(--jbc-gradient);
-  color: white;
-  border: none;
-  border-radius: 24px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: opacity 0.2s, transform 0.1s;
+.composer-send {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--jbc-navy);
+  color: #fff;
+  transition:
+    background-color 0.15s ease,
+    transform 0.1s ease;
 }
 
-.message-send-button:hover:not(:disabled) {
-  opacity: 0.9;
-  transform: scale(1.02);
+.composer-send:hover:not(:disabled) {
+  background: var(--jbc-navy-deep);
 }
 
-.message-send-button:active:not(:disabled) {
-  transform: scale(0.98);
+.composer-send:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
-.message-send-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.composer-send:disabled {
+  background: var(--send-idle);
+  cursor: default;
 }
 
-@media (max-width: 768px) {
-  .message-input {
-    padding: 0.75rem;
+.composer-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .composer-inner {
+    padding: 8px 12px calc(10px + env(safe-area-inset-bottom, 0px));
   }
-  
-  .message-send-button {
-    padding: 0.75rem 1.5rem;
+
+  .composer-note {
+    font-size: 11.5px;
   }
 }
-

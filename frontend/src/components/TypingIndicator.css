@@ -1,46 +1,48 @@
-.typing-indicator {
+.typing {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  margin: 0.5rem 0;
+  gap: 12px;
+  min-height: 36px;
+}
+
+.typing-avatar {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
 }
 
 .typing-dots {
   display: flex;
-  gap: 0.25rem;
+  gap: 5px;
+  padding: 0 4px;
 }
 
 .typing-dots span {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background-color: var(--jbc-blue-light);
-  animation: typing 1.4s infinite;
+  background: var(--jbc-navy);
+  opacity: 0.3;
+  animation: typing-pulse 1.2s ease-in-out infinite;
 }
 
 .typing-dots span:nth-child(2) {
-  animation-delay: 0.2s;
+  animation-delay: 0.15s;
 }
 
 .typing-dots span:nth-child(3) {
-  animation-delay: 0.4s;
+  animation-delay: 0.3s;
 }
 
-@keyframes typing {
-  0%, 60%, 100% {
+@keyframes typing-pulse {
+  0%,
+  100% {
+    opacity: 0.3;
     transform: translateY(0);
-    opacity: 0.7;
   }
-  30% {
-    transform: translateY(-10px);
+  50% {
     opacity: 1;
+    transform: translateY(-2px);
   }
 }
-
-.typing-text {
-  font-size: 0.875rem;
-  color: #666;
-  font-style: italic;
-}
-

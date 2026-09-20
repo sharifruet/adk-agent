@@ -1,7 +1,11 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 import { interactWithAgent, submitLead } from '../services/agentService';
+import { classifyError } from '../utils/errorHandler';
 
 const ConversationContext = createContext(null);
+
+const USER_KEY = 'lic-agent-userId';
+const SESSION_KEY = 'lic-agent-sessionId';
 
 export const useConversation = () => {
   const context = useContext(ConversationContext);
@@ -13,17 +17,10 @@ export const useConversation = () => {
 
 export const ConversationProvider = ({ children }) => {
   const [messages, setMessages] = useState([]);
-  const [userId, setUserId] = useState(() => {
-    // Try to restore from localStorage
-    const saved = localStorage.getItem('lic-agent-userId');
-    return saved || null;
-  });
-  const [sessionId, setSessionId] = useState(() => {
-    // Try to restore from localStorage
-    const saved = localStorage.getItem('lic-agent-sessionId');
-    return saved || null;
-  });
+  const [userId, setUserId] = useState(() => localStorage.getItem(USER_KEY) || null);
+  const [sessionId, setSessionId] = useState(() => localStorage.getItem(SESSION_KEY) || null);
   const [isLoading, setIsLoading] = useState(false);
+  // { kind: 'network' | 'server' | 'client' | 'unknown', detail: string } | null
   const [error, setError] = useState(null);
   const [conversationState, setConversationState] = useState(null);
   const [requiresLeadCapture, setRequiresLeadCapture] = useState(false);
@@ -37,14 +34,14 @@ export const ConversationProvider = ({ children }) => {
   const updateUserId = useCallback((id) => {
     setUserId(id);
     if (id) {
-      localStorage.setItem('lic-agent-userId', id);
+      localStorage.setItem(USER_KEY, id);
     }
   }, []);
 
   const updateSessionId = useCallback((id) => {
     setSessionId(id);
     if (id) {
-      localStorage.setItem('lic-agent-sessionId', id);
+      localStorage.setItem(SESSION_KEY, id);
     }
   }, []);
 
@@ -92,45 +89,35 @@ export const ConversationProvider = ({ children }) => {
         setRequiresLeadCapture(true);
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to send message. Please try again.');
+      setError({ kind: classifyError(err), detail: err.message });
       console.error('Error sending message:', err);
     } finally {
       setIsLoading(false);
     }
   }, [userId, sessionId, updateUserId, updateSessionId]);
 
+  // The form owns its own pending/success state, so this neither toggles
+  // isLoading (which would show the typing dots) nor closes the form.
   const submitCustomerInfo = useCallback(async (info) => {
     if (!sessionId) {
       throw new Error('No active session');
     }
 
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await submitLead(sessionId, info, userId);
-      setCustomerInfo(info);
-      setRequiresLeadCapture(false);
-      return response;
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to submit information. Please try again.');
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
+    const response = await submitLead(sessionId, info, userId);
+    setCustomerInfo(info);
+    return response;
   }, [sessionId, userId]);
 
+  // Starts a fresh conversation. The backend session is dropped too, so the
+  // agent does not carry memory of the cleared messages into the new chat.
   const clearConversation = useCallback(() => {
     setMessages([]);
     setError(null);
     setConversationState(null);
     setRequiresLeadCapture(false);
     setCustomerInfo({ name: '', phone: '', email: '' });
-    // Optionally clear session
-    // setSessionId(null);
-    // setUserId(null);
-    // localStorage.removeItem('lic-agent-sessionId');
-    // localStorage.removeItem('lic-agent-userId');
+    setSessionId(null);
+    localStorage.removeItem(SESSION_KEY);
   }, []);
 
   const value = {
@@ -154,4 +141,3 @@ export const ConversationProvider = ({ children }) => {
     </ConversationContext.Provider>
   );
 };
-

@@ -1,13 +1,7 @@
-import './App.css'
 import ChatInterface from './components/ChatInterface'
 
 function App() {
-  return (
-    <div className="app">
-      <ChatInterface />
-    </div>
-  )
+  return <ChatInterface />
 }
 
 export default App
-

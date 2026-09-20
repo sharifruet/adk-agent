@@ -1,105 +1,193 @@
-.message {
+.msg {
   display: flex;
-  margin-bottom: 1rem;
-  animation: fadeIn 0.3s ease-in;
+  gap: 12px;
+  animation: msg-in 220ms ease-out both;
 }
 
-@keyframes fadeIn {
+@keyframes msg-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
-.message.user {
+.msg-agent {
+  align-items: flex-start;
+}
+
+.msg-user {
   justify-content: flex-end;
 }
 
-.message.agent {
-  justify-content: flex-start;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-
-.message-logo {
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
+.msg-avatar {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin-top: 4px;
   object-fit: contain;
-  opacity: 0.5;
 }
 
-.message-logo-left {
-  margin-top: 0.5rem;
+.msg-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
-.message-logo-right {
-  margin-top: 0.5rem;
+.msg-user .msg-body {
+  max-width: min(80%, 560px);
+  align-items: flex-end;
 }
 
-.message-content {
-  max-width: 70%;
-  padding: 0.75rem 1rem;
-  border-radius: 12px;
-  word-wrap: break-word;
+.msg-text {
+  font-size: 16px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 
-.message.user .message-content {
-  background: var(--jbc-gradient);
-  color: white;
-  border-bottom-right-radius: 4px;
-}
-
-.message.agent .message-content {
-  background-color: #ffffff;
-  color: #333;
-  border: 1px solid #e0e0e0;
-  border-bottom-left-radius: 4px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-.message-text {
-  margin-bottom: 0.25rem;
-  line-height: 1.6;
+/* The customer speaks in a quiet bubble; the agent speaks on the canvas. */
+.msg-user .msg-text {
+  padding: 10px 16px;
+  border-radius: 18px 18px 4px 18px;
+  background: var(--mist);
   white-space: pre-wrap;
 }
 
-/* Markdown rendering for agent messages */
-.message-text .message-paragraph {
-  margin: 0 0 0.5rem 0;
-}
-.message-text .message-paragraph:last-child {
-  margin-bottom: 0;
-}
-.message-text .message-list {
-  margin: 0.5rem 0;
-  padding-left: 1.25rem;
-  list-style-type: disc;
-}
-.message-text .message-list-ordered {
-  list-style-type: decimal;
-}
-.message-text .message-list-item {
-  margin-bottom: 0.35rem;
-}
-.message-text .message-bold {
-  font-weight: 600;
-  color: inherit;
+.msg-agent .msg-text {
+  padding-top: 3px; /* first line sits level with the avatar */
 }
 
-.message-timestamp {
-  font-size: 0.75rem;
-  opacity: 0.7;
-  margin-top: 0.25rem;
+.msg-time {
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
 }
 
-@media (max-width: 768px) {
-  .message-content {
-    max-width: 85%;
+/* With a pointer, times stay out of the way until the row is hovered. On
+   touch there is no hover, so they are always shown. */
+@media (hover: hover) {
+  .msg-time {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .msg:hover .msg-time,
+  .msg:focus-within .msg-time {
+    opacity: 1;
   }
 }
 
+/* Markdown in agent replies --------------------------------------------- */
+
+.msg-text > :first-child {
+  margin-top: 0;
+}
+
+.msg-text > :last-child {
+  margin-bottom: 0;
+}
+
+.msg-text p {
+  margin: 0 0 0.75em;
+}
+
+.msg-text ul,
+.msg-text ol {
+  margin: 0.25em 0 0.75em;
+  padding-inline-start: 1.5em;
+}
+
+.msg-text li {
+  margin: 0.2em 0;
+}
+
+.msg-text li > p {
+  margin: 0;
+}
+
+.msg-text li::marker {
+  color: var(--ink-muted);
+}
+
+.msg-text strong {
+  font-weight: 600;
+}
+
+.msg-text a {
+  color: var(--jbc-navy);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.16em;
+}
+
+.msg-text h1,
+.msg-text h2,
+.msg-text h3,
+.msg-text h4 {
+  margin: 1em 0 0.35em;
+  font-size: 1.04em;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.msg-text code {
+  padding: 0.1em 0.4em;
+  border-radius: 5px;
+  background: var(--mist);
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+}
+
+.msg-text pre {
+  margin: 0.5em 0 0.75em;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--mist);
+  overflow-x: auto;
+}
+
+.msg-text pre code {
+  padding: 0;
+  background: none;
+}
+
+.msg-text blockquote {
+  margin: 0.5em 0 0.75em;
+  padding-inline-start: 12px;
+  border-inline-start: 2px solid var(--line-strong);
+  color: var(--ink-muted);
+}
+
+.msg-text hr {
+  margin: 1em 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.msg-text table {
+  display: block;
+  width: 100%;
+  margin: 0.5em 0 0.75em;
+  border-collapse: collapse;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  overflow-x: auto;
+}
+
+.msg-text th,
+.msg-text td {
+  padding: 6px 14px 6px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: start;
+  vertical-align: top;
+}
+
+.msg-text th {
+  font-weight: 600;
+}

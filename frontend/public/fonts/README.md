@@ -1,30 +1,29 @@
 # Fonts
 
-The app renders in **Nikosh**, the Bangla Unicode font published by the
-Bangladesh Computer Council (BCC). It is not on Google Fonts or any public CDN,
-so it has to be self-hosted from this folder.
+The interface uses two web fonts from Google Fonts, one per script:
 
-## Required files
+- **Manrope** for Latin text (variable, 400–700)
+- **Hind Siliguri** for Bangla text (400, 500, 600, 700)
 
-Drop these two files in this directory (they are referenced by the `@font-face`
-rule in `src/index.css`):
+Both are loaded from `index.html`. Manrope is listed first in the font stack
+and has no Bengali glyphs, so the browser resolves Latin letters, digits and
+punctuation to Manrope and every Bangla character to Hind Siliguri, character
+by character. The stack lives in `src/index.css`.
+
+## Nikosh (offline fallback)
+
+**Nikosh**, the Bangla Unicode face published by the Bangladesh Computer
+Council, is self-hosted here as a fallback for Bangla when Google Fonts cannot
+be reached. It is confined to the Bengali block with `unicode-range`, so its
+weaker Latin glyphs never appear.
 
 - `Nikosh.woff2` — used by every modern browser
 - `Nikosh.ttf` — fallback for older browsers
 
-## Where to get it
-
-`Nikosh.ttf` is distributed by BCC and bundled with Avro Keyboard and Bijoy. On
-a Windows machine that already has Avro installed, it is at
-`C:\Windows\Fonts\Nikosh.ttf`.
-
-## Converting to woff2
+`Nikosh.ttf` is distributed by BCC and bundled with Avro Keyboard and Bijoy.
+To regenerate the woff2:
 
 ```bash
 # pip install fonttools brotli
 fonttools ttLib.woff2 compress -o Nikosh.woff2 Nikosh.ttf
 ```
-
-Until these files are added, the app falls back to `Noto Sans Bengali` /
-`SolaimanLipi` / the system Bangla font — the layout is unaffected, only the
-typeface differs.

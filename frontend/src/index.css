@@ -1,13 +1,18 @@
-/* Nikosh — Bangla Unicode font from the Bangladesh Computer Council.
-   Not available on any CDN, so it is self-hosted from /public/fonts.
-   `local()` is tried first: Nikosh ships with Avro/Bijoy and is already
-   installed on most machines in Bangladesh, which skips the download.
+/* ---------------------------------------------------------------------------
+   Typography
 
-   `unicode-range` confines Nikosh to Bangla codepoints. Nikosh does contain
-   Latin glyphs, but they are markedly weaker than its Bangla, so without this
-   the whole UI — English labels, digits, timestamps — would render in them.
-   With it, the browser applies Nikosh per character: Bangla gets Nikosh,
-   everything else falls through to the Latin stack below. */
+   Two families, one per script:
+     Latin  — Manrope        (Google Fonts, variable 400–700)
+     Bangla — Hind Siliguri  (Google Fonts, 400/500/600/700)
+
+   Manrope has no Bengali glyphs, so it is listed first: the browser resolves
+   Latin letters, digits and punctuation to Manrope and every Bangla codepoint
+   falls through to Hind Siliguri, character by character. No unicode-range
+   tricks are needed for the web fonts.
+
+   Nikosh (the Bangladesh Computer Council face, self-hosted in /public/fonts)
+   stays as an offline fallback for Bangla only. Its Latin glyphs are weak, so
+   `unicode-range` confines it to the Bengali block. */
 @font-face {
   font-family: 'Nikosh';
   src:
@@ -18,40 +23,70 @@
   font-weight: normal;
   font-style: normal;
   font-display: swap;
-  /* Bengali block, plus the danda/ZWNJ/ZWJ marks Bangla shaping relies on. */
   unicode-range: U+0964-0965, U+0980-09FE, U+200C-200D, U+20B9, U+25CC;
 }
 
 :root {
-  /* JBC brand palette. --jbc-blue is sampled straight from the corporation
-     logo (rgb 36, 62, 139); every other value is derived from it. */
-  --jbc-blue: #243e8b;
-  --jbc-blue-dark: #1b2f68;
-  --jbc-blue-light: #3550a5;
-  --jbc-gradient: linear-gradient(135deg, #243e8b 0%, #1b2f68 100%);
-  --jbc-surface: #f4f6fb;
+  /* Colour. --jbc-navy is sampled from the corporation logo (rgb 36 62 139);
+     the ink and mist tones are tinted from it so the page reads as one hue. */
+  --jbc-navy: #243e8b;
+  --jbc-navy-deep: #1a2e6b;
+  --ink: #1c2140;
+  --ink-muted: #6b7189;
+  --canvas: #ffffff;
+  --mist: #f3f5fa;
+  --mist-deep: #e8ecf5;
+  --line: #e3e7f1;
+  --line-strong: #cfd6e8;
+  --send-idle: #c9d0e3;
 
-  /* Nikosh is first but only ever claims Bangla (see unicode-range above), so
-     Latin resolves to Inter/system-ui. The Bangla fallbacks sit *after* the
-     Latin families on purpose: they carry Latin glyphs of their own and would
-     otherwise take over English text whenever Nikosh is unavailable. */
-  font-family: 'Nikosh', Inter, system-ui, Avenir, Helvetica, Arial,
-    'Noto Sans Bengali', 'SolaimanLipi', sans-serif;
-  line-height: 1.6;
+  --danger: #b42318;
+  --danger-bg: #fef3f2;
+  --danger-line: #f4c7c3;
+  --success: #067647;
+  --success-bg: #ecfdf3;
+
+  --font-sans:
+    'Manrope', 'Hind Siliguri', 'Nikosh', 'Noto Sans Bengali', 'Vrinda',
+    system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  --column: 720px;
+  --focus-ring: 0 0 0 3px rgba(36, 62, 139, 0.24);
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  /* Bangla needs more headroom than Latin: the matra sits above the x-height
+     and conjuncts stack below the baseline. 1.7 keeps both scripts open. */
+  line-height: 1.7;
   font-weight: 400;
-
-  /* Nikosh ships a single weight — let the browser synthesise bold so that
-     headings and labels keep their emphasis. */
-  font-synthesis: weight;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* Form controls do not inherit the document font by default. */
@@ -59,17 +94,43 @@ input,
 button,
 textarea,
 select {
-  font-family: inherit;
+  font: inherit;
+  color: inherit;
 }
 
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  background-color: var(--jbc-surface);
+button {
+  cursor: pointer;
 }
 
-#root {
-  width: 100%;
-  min-height: 100vh;
+img {
+  display: block;
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 2px solid var(--jbc-navy);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

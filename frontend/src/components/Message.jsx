@@ -1,41 +1,42 @@
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { useLocale } from '../context/LocaleContext';
+import { formatTime } from '../utils/formatTime';
 import logo from '../assets/logo.png';
 import './Message.css';
 
+const remarkPlugins = [remarkGfm];
+
+const markdownComponents = {
+  // eslint-disable-next-line no-unused-vars
+  a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+};
+
 const Message = ({ message }) => {
   const isUser = message.type === 'user';
-  const timestamp = new Date(message.timestamp).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const { locale, t } = useLocale();
+  const date = new Date(message.timestamp);
 
   return (
-    <div className={`message ${isUser ? 'user' : 'agent'}`}>
-      {!isUser && <img src={logo} alt="" className="message-logo message-logo-left" />}
-      <div className="message-content">
-        <div className="message-text">
+    <article className={`msg ${isUser ? 'msg-user' : 'msg-agent'}`}>
+      {!isUser && <img src={logo} alt="" className="msg-avatar" />}
+      <div className="msg-body">
+        <span className="sr-only">{isUser ? t.you : t.assistant}: </span>
+        <div className="msg-text">
           {isUser ? (
             message.content
           ) : (
-            <ReactMarkdown
-              components={{
-                ul: ({ children }) => <ul className="message-list">{children}</ul>,
-                ol: ({ children }) => <ol className="message-list message-list-ordered">{children}</ol>,
-                li: ({ children }) => <li className="message-list-item">{children}</li>,
-                strong: ({ children }) => <strong className="message-bold">{children}</strong>,
-                p: ({ children }) => <p className="message-paragraph">{children}</p>,
-              }}
-            >
+            <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
               {message.content}
             </ReactMarkdown>
           )}
         </div>
-        <div className="message-timestamp">{timestamp}</div>
+        <time className="msg-time" dateTime={date.toISOString()}>
+          {formatTime(date, locale)}
+        </time>
       </div>
-      {!isUser && <img src={logo} alt="" className="message-logo message-logo-right" />}
-    </div>
+    </article>
   );
 };
 
 export default Message;
-
