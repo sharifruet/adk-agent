@@ -38,13 +38,9 @@ com:
         api-key: your-api-key-here
 ```
 
-Then use the provided script to automatically set the environment variable:
+The key is passed straight to the Gemini model, so this works for `mvn spring-boot:run` and for a packaged jar (`java -jar`) alike, with no environment variable needed. When the line is left at its default (`${GEMINI_API_KEY:${GOOGLE_API_KEY:}}`), the value is taken from those environment variables instead.
 
-```bash
-./run.sh
-```
-
-The script reads the API key from `application.yaml` and sets it as an environment variable before starting the application.
+The `run.sh` script still works: it reads the key from `application.yaml`, exports it, and starts the application with Maven.
 
 ## Running the Application
 
@@ -74,11 +70,10 @@ See `apis.rest` for example requests using the VS Code REST Client extension.
 
 ## Troubleshooting
 
-If you see the error: "API key must either be provided or set in the environment variable GOOGLE_API_KEY or GEMINI_API_KEY"
+If you see the error "API key must either be provided or set in the environment variable GOOGLE_API_KEY or GEMINI_API_KEY", the application found no key at all. Either:
 
-1. Ensure the environment variable is set before the JVM starts
-2. Use the `run.sh` script which handles this automatically
-3. Or set it manually: `export GEMINI_API_KEY=your-key` before running
+1. Put the key in `application.yaml` under `com.i2gether.lic.agent.api-key` and rebuild the jar, or
+2. Set `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) in the environment of the process that runs the jar.
 
-Note: The library checks environment variables at runtime, so they must be set before starting the application. Setting them programmatically inside the application may not work due to JVM security restrictions.
+Note: the Google client library only reads those environment variables, and on Java 17+ a running application cannot inject variables into its own environment. That is why the key from `application.yaml` is handed to the model explicitly in `AgentConfiguration` rather than copied into the environment.
 
