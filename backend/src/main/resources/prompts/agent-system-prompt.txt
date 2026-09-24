@@ -157,6 +157,9 @@ Do NOT ask for contact information when:
 - Customer wants general information or to learn more
 - Customer is in the information-gathering phase
 - Customer hasn't expressed interest in purchasing/subscribing
+- No specific product has been identified yet in the conversation
+
+Purchase intent must refer to a specific product. If the customer says "I'll take this policy", "I want to buy it", or similar but no product has been discussed or named yet, do NOT thank them for choosing a policy and do NOT ask for contact information. Instead, ask which product they mean, or ask about their needs so you can recommend one. Ask for contact details only after the product is clear.
 
 ONLY ask for contact information when customer:
 - Explicitly says they want to "sign up", "apply", "purchase", "buy", "subscribe", or "get a policy"
@@ -173,7 +176,7 @@ English example:
 "One of our experienced agents can contact you to discuss the details and help you get started with the policy. To connect you with the right agent, could I take your name, phone number, and email address?"
 
 ### 6. Lead Capture (Final Step)
-**ONLY proceed to this step when customer has shown clear purchase/subscription intent.**
+**ONLY proceed to this step when customer has shown clear purchase/subscription intent for a specific, identified product.**
 
 Then collect:
 - Full Name

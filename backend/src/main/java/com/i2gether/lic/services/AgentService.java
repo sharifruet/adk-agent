@@ -58,7 +58,7 @@ public class AgentService {
         leadManagementService.addConversationMessage(sessionId, "Agent: " + answer);
 
         // Detect interest signals and determine if lead capture is needed
-        boolean requiresLeadCapture = detectInterestSignal(request.question(), answer);
+        boolean requiresLeadCapture = detectInterestSignal(sessionId, answer);
         
         // Determine conversation state based on content
         ConversationState conversationState = determineConversationState(request.question(), answer);
@@ -67,67 +67,16 @@ public class AgentService {
     }
 
     /**
-     * Detect if customer is showing CLEAR PURCHASE INTENT and lead capture should be initiated.
-     * Only triggers on explicit purchase/subscription intent, not general information requests.
+     * Detect if lead capture should be initiated.
+     * Triggers only when the agent is asking for contact information in this reply AND the
+     * customer has shown purchase intent somewhere in the session. The agent's ask is required
+     * because intent alone ("I'll take this policy") may refer to no product yet, in which case
+     * the agent asks which product is meant instead of collecting contact details.
      */
-    private boolean detectInterestSignal(String userQuestion, String agentAnswer) {
-        String userLower = userQuestion.toLowerCase(Locale.ROOT);
+    private boolean detectInterestSignal(UUID sessionId, String agentAnswer) {
         String agentLower = agentAnswer.toLowerCase(Locale.ROOT);
-        String combined = (userQuestion + " " + agentAnswer).toLowerCase(Locale.ROOT);
-        
-        // STRONG purchase intent signals - only these should trigger lead capture
-        String[] strongPurchaseIntent = {
-            "i want to sign up",
-            "i want to apply",
-            "i want to purchase",
-            "i want to buy",
-            "i want to subscribe",
-            "i'd like to sign up",
-            "i'd like to apply",
-            "i'd like to purchase",
-            "i'd like to buy",
-            "i'd like to subscribe",
-            "i would like to sign up",
-            "i would like to apply",
-            "i would like to purchase",
-            "i would like to buy",
-            "i would like to subscribe",
-            "sign me up",
-            "i'm ready to apply",
-            "i'm ready to purchase",
-            "i'm ready to buy",
-            "i'm ready to sign up",
-            "i'm ready to subscribe",
-            "let's proceed",
-            "let's move forward",
-            "i'll take it",
-            "i'll take this",
-            "i want this policy",
-            "i want this insurance",
-            "how do i apply",
-            "how do i sign up",
-            "how do i purchase",
-            "how do i buy",
-            "how can i apply",
-            "how can i sign up",
-            "how can i purchase",
-            "how can i buy",
-            "i'm ready",
-            "ready to apply",
-            "ready to purchase",
-            "ready to buy",
-            "ready to sign up"
-        };
-        
-        // Check for strong purchase intent in user's question
-        for (String intent : strongPurchaseIntent) {
-            if (userLower.contains(intent)) {
-                return true;
-            }
-        }
-        
-        // Check if agent is explicitly asking for contact information (only if user showed purchase intent first)
-        // This is a secondary check - agent should only ask after user shows intent
+
+        // Check if agent is explicitly asking for contact information
         String[] leadCaptureKeywords = {
             "could i get your name",
             "can i get your name",
@@ -143,7 +92,6 @@ public class AgentService {
             "email address"
         };
         
-        // Only trigger if agent is asking AND user showed some purchase intent
         boolean agentAsking = false;
         for (String keyword : leadCaptureKeywords) {
             if (agentLower.contains(keyword)) {
@@ -151,20 +99,29 @@ public class AgentService {
                 break;
             }
         }
-        
-        // If agent is asking, check if user showed any purchase intent
-        if (agentAsking) {
-            String[] anyPurchaseHint = {
-                "sign up", "apply", "purchase", "buy", "subscribe", "get started", 
-                "proceed", "move forward", "ready", "interested in getting"
-            };
-            for (String hint : anyPurchaseHint) {
-                if (userLower.contains(hint)) {
+        if (!agentAsking) {
+            return false;
+        }
+
+        // Check if user showed purchase intent in any message of this session, since the
+        // product may have been clarified in a later message than the one expressing intent
+        String[] purchaseIntent = {
+            "sign up", "sign me up", "apply", "purchase", "buy", "subscribe", "get started",
+            "proceed", "move forward", "ready", "interested in getting",
+            "i'll take", "i will take", "i want this policy", "i want this insurance"
+        };
+        for (String message : leadManagementService.getConversationHistory(sessionId)) {
+            if (!message.startsWith("User: ")) {
+                continue;
+            }
+            String userLower = message.toLowerCase(Locale.ROOT);
+            for (String intent : purchaseIntent) {
+                if (userLower.contains(intent)) {
                     return true;
                 }
             }
         }
-        
+
         return false;
     }
 

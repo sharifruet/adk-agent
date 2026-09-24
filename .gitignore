@@ -47,3 +47,6 @@ frontend/yarn-error.log*
 application-local.yaml
 application-local.properties
 
+# Claude Code
+/CLAUDE.md
+
